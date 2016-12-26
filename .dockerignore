@@ -1,0 +1,8 @@
+.git
+.gitignore
+.glide
+.gtm
+.idea
+.cover
+deploy
+vendor
