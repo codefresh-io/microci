@@ -13,9 +13,12 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
+
+	"github.com/codefresh-io/microci/container"
 )
 
 var (
+	gClient   container.Client
 	gStopChan chan bool
 	gWG       sync.WaitGroup
 )
@@ -50,10 +53,9 @@ func main() {
 	}
 
 	app := cli.NewApp()
-	app.Name = "Bard"
+	app.Name = "MicroCI"
 	app.Version = HumanVersion
-	app.Usage = "A build flow tool for Docker applications"
-	app.ArgsUsage = "step/s"
+	app.Usage = "Minimalistic CI tool for Docker"
 	app.Before = before
 	app.Commands = []cli.Command{}
 	app.Flags = []cli.Flag{
@@ -95,11 +97,6 @@ func main() {
 			Name:  "json",
 			Usage: "produce log in JSON format: Logstash and Splunk friendly",
 		},
-		cli.StringFlag{
-			Name:  "filename, f",
-			Usage: "path to config file",
-			Value: "codefresh.yaml",
-		},
 	}
 
 	app.Run(os.Args)
@@ -119,9 +116,8 @@ func before(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
-	log.Debugf("tls: %v", tls)
 	// create new Docker client
-	//client = container.NewClient(c.GlobalString("host"), tls)
+	gClient = container.NewClient(c.GlobalString("host"), tls)
 	// create new Chaos instance
 	//chaos = action.NewChaos()
 	// habdle termination signal
@@ -141,9 +137,9 @@ func handleSignals() {
 
 	go func() {
 		sid := <-sigs
-		log.Debugf("Recieved signal: %d", sid)
+		log.Debugf("Received signal: %d", sid)
 		gStopChan <- true
-		log.Debug("Sending stop signal to runnung steps ...")
+		log.Debug("Sending stop signal to running steps ...")
 		gWG.Wait()
 		log.Debug("Graceful exit :-)")
 		os.Exit(1)
