@@ -29,6 +29,7 @@ var (
 	gClient   container.Client
 	gStopChan chan bool
 	gWG       sync.WaitGroup
+	gWorkdir  string
 )
 
 var (
@@ -78,19 +79,20 @@ func main() {
 					Usage: "ip the webhook should serve hooks on",
 					Value: "0.0.0.0",
 				},
-				cli.StringFlag{
-					Name:  "port",
-					Usage: "port the webhook should serve hooks on",
-					Value: "9000",
-				},
 				cli.IntFlag{
 					Name:  "port",
 					Usage: "port the webhook should serve hooks on",
 					Value: 9000,
 				},
+				cli.StringFlag{
+					Name:        "workdir",
+					Usage:       "working directory for git clone/pull operations",
+					Value:       ".",
+					Destination: &gWorkdir,
+				},
 			},
 			Usage:       "start webhook server",
-			ArgsUsage:   "no idea yet ...",
+			ArgsUsage:   "configuration file",
 			Description: "start webhook server to handle Push events coming from GitHub",
 			Action:      webhookServer,
 			Before:      beforeCommand,
