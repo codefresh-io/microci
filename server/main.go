@@ -7,6 +7,7 @@ import (
 	"io/ioutil"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -14,7 +15,14 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 
+	"gopkg.in/go-playground/webhooks.v3"
+	"gopkg.in/go-playground/webhooks.v3/github"
+
 	"github.com/codefresh-io/microci/container"
+)
+
+const (
+	gitHubPath = "/github"
 )
 
 var (
@@ -57,7 +65,37 @@ func main() {
 	app.Version = HumanVersion
 	app.Usage = "Minimalistic CI tool for Docker"
 	app.Before = before
-	app.Commands = []cli.Command{}
+	app.Commands = []cli.Command{
+		{
+			Name: "server",
+			Flags: []cli.Flag{
+				cli.StringFlag{
+					Name:  "secret",
+					Usage: "GitHub webhook secret",
+				},
+				cli.StringFlag{
+					Name:  "ip",
+					Usage: "ip the webhook should serve hooks on",
+					Value: "0.0.0.0",
+				},
+				cli.StringFlag{
+					Name:  "port",
+					Usage: "port the webhook should serve hooks on",
+					Value: "9000",
+				},
+				cli.IntFlag{
+					Name:  "port",
+					Usage: "port the webhook should serve hooks on",
+					Value: 9000,
+				},
+			},
+			Usage:       "start webhook server",
+			ArgsUsage:   "no idea yet ...",
+			Description: "start webhook server to handle Push events coming from GitHub",
+			Action:      webhookServer,
+			Before:      beforeCommand,
+		},
+	}
 	app.Flags = []cli.Flag{
 		cli.StringFlag{
 			Name:   "host, H",
@@ -92,6 +130,10 @@ func main() {
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug mode with verbose logging",
+		},
+		cli.BoolFlag{
+			Name:  "dry-run",
+			Usage: "do not execute commands, just log",
 		},
 		cli.BoolFlag{
 			Name:  "json",
@@ -193,4 +235,27 @@ func tlsConfig(c *cli.Context) (*tls.Config, error) {
 		}
 	}
 	return tlsConfig, nil
+}
+
+// beforeCommand run before each command
+func beforeCommand(c *cli.Context) error {
+	// get recurrent time interval
+	return nil
+}
+
+// Serve webhooks
+func webhookServer(c *cli.Context) {
+	// get GitHub secret
+	secret := c.String("secret")
+	// get port
+	port := c.Int("port")
+	// create new webhook
+	hook := github.New(&github.Config{Secret: secret})
+	// register event handler
+	hook.RegisterEvents(handlePushEvent, github.PushEvent)
+	// start webhook server
+	err := webhooks.Run(hook, ":"+strconv.Itoa(port), gitHubPath)
+	if err != nil {
+		log.Error(err)
+	}
 }
