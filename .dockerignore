@@ -3,5 +3,6 @@
 .glide
 .idea
 .cover
+.vscode
 deploy
 vendor
