@@ -2,7 +2,6 @@ package container
 
 import (
 	"context"
-	"crypto/tls"
 	"encoding/json"
 	"io"
 
@@ -30,7 +29,7 @@ type BuildTarget struct {
 
 // NewClient returns a new Client instance which can be used to interact with
 // the Docker API.
-func NewClient(dockerHost string, tlsConfig *tls.Config) DockerClient {
+func NewClient() DockerClient {
 	apiClient, err := client.NewEnvClient()
 	if err != nil {
 		log.Fatalf("Error instantiating Docker engine-api: %s", err)

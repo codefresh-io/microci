@@ -24,7 +24,7 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 	// format build report message
 	var output string
 	output = fmt.Sprintf("*Build:* `%s:%s`\n", target.Name, target.Tag)
-	output += fmt.Sprintf("git context: %s\n", target.GitContext)
+	output += fmt.Sprintf("*git context:* %s\n", target.GitContext)
 	start := time.Now()
 	output += "```\n"
 	scanner := bufio.NewScanner(r)
@@ -40,8 +40,9 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 	if err := scanner.Err(); err != nil {
 		log.Error(err)
 	}
-	output += "```"
-	output += fmt.Sprintf("Build duration: %s\n", time.Since(start))
+	output += "```\n"
+	output += fmt.Sprintf("*build duration:* %s\n", time.Since(start))
+	log.Debugf("Build %s:%s completed", target.Name, target.Tag)
 
 	// prepare Slack message
 	api := slack.New(gSlackToken)

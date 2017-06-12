@@ -2,14 +2,10 @@ package main
 
 import (
 	"context"
-	"crypto/tls"
-	"crypto/x509"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
@@ -61,6 +57,23 @@ func main() {
 	app.Name = "MicroCI"
 	app.Version = HumanVersion
 	app.Usage = "Minimalistic CI tool for Docker"
+	app.Description = `
+MicroCI is a minimalistic Continuous Integration (CI) tool designed and tuned for Docker-based microservices.
+
+        .
+       ":"
+     ___:_____     |"\/"|
+   ,'         \.    \  /
+   |  O        \___/  |
+ ~^~^~^~^~^~^~^~^~^~^~^~^~
+ 
+ MicroCI respects DOCKER environment variables:
+   - DOCKER_HOST        - set the url to the docker serve (default unix:///var/run/docker.sock)
+   - DOCKER_API_VERSION - set the version of the API to reach
+   - DOCKER_CERT_PATH   - path to load the TLS certificates from
+   - DOCKER_TLS_VERIFY  - enable or disable TLS verification, off by default
+   
+Copyright © Codefresh.io`
 	app.Before = before
 	app.Commands = []cli.Command{
 		{
@@ -76,19 +89,17 @@ func main() {
 					Value: "0.0.0.0",
 				},
 				cli.IntFlag{
-					Name:  "port",
+					Name:  "port, p",
 					Usage: "port the webhook should serve hooks on",
 					Value: 9000,
 				},
 				cli.StringFlag{
-					Name:        "slack-token",
-					Usage:       "Slack API token",
-					Destination: &gSlackToken,
+					Name:  "slack-token, t",
+					Usage: "Slack API token",
 				},
 				cli.StringFlag{
-					Name:        "slack-channel",
-					Usage:       "Slack channel to post build results",
-					Destination: &gSlackChannel,
+					Name:  "slack-channel, c",
+					Usage: "Slack channel to post build results",
 				},
 			},
 			Usage:       "start webhook server",
@@ -132,21 +143,9 @@ func before(c *cli.Context) error {
 	if c.GlobalBool("json") {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
-	// Set-up container client
-	tls, err := tlsConfig(c)
-	if err != nil {
-		return err
-	}
 
 	// create new Docker client
-	gClient = container.NewClient(c.GlobalString("host"), tls)
-
-	// set global Notify object to Slack or STDOUT
-	if gSlackToken != "" {
-		gNotify = SlackNotify{}
-	} else {
-		gNotify = StdoutNotify{}
-	}
+	gClient = container.NewClient()
 
 	// handle stop signals
 	handleSignals()
@@ -170,58 +169,9 @@ func handleSignals() {
 			log.Debug("Canceling running command")
 			cancelFn.(context.CancelFunc)()
 		}
-		fmt.Println("Graceful exit :-)")
+		fmt.Println("\nGracefully exiting :-)")
 		os.Exit(0)
 	}()
-}
-
-// tlsConfig translates the command-line options into a tls.Config struct
-func tlsConfig(c *cli.Context) (*tls.Config, error) {
-	var tlsConfig *tls.Config
-	var err error
-	caCertFlag := c.GlobalString("tlscacert")
-	certFlag := c.GlobalString("tlscert")
-	keyFlag := c.GlobalString("tlskey")
-
-	if c.GlobalBool("tls") || c.GlobalBool("tlsverify") {
-		tlsConfig = &tls.Config{
-			InsecureSkipVerify: !c.GlobalBool("tlsverify"),
-		}
-
-		// Load CA cert
-		if caCertFlag != "" {
-			var caCert []byte
-			if strings.HasPrefix(caCertFlag, "/") {
-				caCert, err = ioutil.ReadFile(caCertFlag)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				caCert = []byte(caCertFlag)
-			}
-			caCertPool := x509.NewCertPool()
-			caCertPool.AppendCertsFromPEM(caCert)
-			tlsConfig.RootCAs = caCertPool
-		}
-
-		// Load client certificate
-		if certFlag != "" && keyFlag != "" {
-			var cert tls.Certificate
-			if strings.HasPrefix(certFlag, "/") && strings.HasPrefix(keyFlag, "/") {
-				cert, err = tls.LoadX509KeyPair(certFlag, keyFlag)
-				if err != nil {
-					return nil, err
-				}
-			} else {
-				cert, err = tls.X509KeyPair([]byte(certFlag), []byte(keyFlag))
-				if err != nil {
-					return nil, err
-				}
-			}
-			tlsConfig.Certificates = []tls.Certificate{cert}
-		}
-	}
-	return tlsConfig, nil
 }
 
 // beforeCommand run before each command
@@ -236,6 +186,15 @@ func webhookServer(c *cli.Context) {
 	secret := c.String("secret")
 	// get port
 	port := c.Int("port")
+	// get slack token and channel
+	gSlackToken = c.String("slack-token")
+	gSlackChannel = c.String("slack-channel")
+	// set global Notify object to Slack or STDOUT
+	if gSlackToken != "" {
+		gNotify = SlackNotify{}
+	} else {
+		gNotify = StdoutNotify{}
+	}
 	// print status
 	fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
 	// create new webhook
