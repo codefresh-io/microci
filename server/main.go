@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"crypto/tls"
 	"crypto/x509"
 	"fmt"
@@ -9,7 +10,6 @@ import (
 	"os/signal"
 	"strconv"
 	"strings"
-	"sync"
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
@@ -26,10 +26,9 @@ const (
 )
 
 var (
-	gClient   container.Client
-	gStopChan chan bool
-	gWG       sync.WaitGroup
-	gWorkdir  string
+	gClient         container.DockerClient
+	gStopChan       chan bool
+	gCancelCommands []interface{}
 )
 
 var (
@@ -84,17 +83,18 @@ func main() {
 					Usage: "port the webhook should serve hooks on",
 					Value: 9000,
 				},
-				cli.StringFlag{
-					Name:        "workdir",
-					Usage:       "working directory for git clone/pull operations",
-					Value:       ".",
-					Destination: &gWorkdir,
-				},
 			},
 			Usage:       "start webhook server",
 			ArgsUsage:   "configuration file",
 			Description: "start webhook server to handle Push events coming from GitHub",
 			Action:      webhookServer,
+			Before:      beforeCommand,
+		},
+		{
+			Name:        "info",
+			Usage:       "docker info",
+			Description: "show docker info",
+			Action:      dockerInfo,
 			Before:      beforeCommand,
 		},
 	}
@@ -183,10 +183,12 @@ func handleSignals() {
 		sid := <-sigs
 		log.Debugf("Received signal: %d", sid)
 		gStopChan <- true
-		log.Debug("Sending stop signal to running steps ...")
-		gWG.Wait()
+		for _, cancelFn := range gCancelCommands {
+			log.Debug("Canceling running command")
+			cancelFn.(context.CancelFunc)()
+		}
 		log.Debug("Graceful exit :-)")
-		os.Exit(1)
+		os.Exit(0)
 	}()
 }
 
@@ -253,11 +255,23 @@ func webhookServer(c *cli.Context) {
 	port := c.Int("port")
 	// create new webhook
 	hook := github.New(&github.Config{Secret: secret})
-	// register event handler
+	// register push event handler
 	hook.RegisterEvents(handlePushEvent, github.PushEvent)
+	// register create event handler
+	hook.RegisterEvents(handleCreateEvent, github.CreateEvent)
 	// start webhook server
 	err := webhooks.Run(hook, ":"+strconv.Itoa(port), gitHubPath)
 	if err != nil {
 		log.Error(err)
 	}
+}
+
+func dockerInfo(c *cli.Context) {
+	ctx, cancel := context.WithCancel(context.Background())
+	gCancelCommands = append(gCancelCommands, cancel)
+	info, err := gClient.Info(ctx)
+	if err != nil {
+		log.Error(err)
+	}
+	fmt.Printf(info)
 }

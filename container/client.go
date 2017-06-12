@@ -1,13 +1,19 @@
 package container
 
 import (
+	"context"
 	"crypto/tls"
+	"encoding/json"
+	"fmt"
+	"io"
+	"io/ioutil"
 	"net/http"
 	"os"
 
 	log "github.com/Sirupsen/logrus"
 
-	engineapi "github.com/docker/docker/client"
+	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/client"
 )
 
 const (
@@ -15,14 +21,16 @@ const (
 	DefaultAPIVersion = "v1.29"
 )
 
-// Client interface
-type Client interface {
+// DockerClient interface
+type DockerClient interface {
+	BuildImage(ctx context.Context, cloneURL, ref, name, tag string) (io.ReadCloser, error)
+	Info(ctx context.Context) (string, error)
 }
 
 // NewClient returns a new Client instance which can be used to interact with
 // the Docker API.
-func NewClient(dockerHost string, tlsConfig *tls.Config) Client {
-	client := &http.Client{
+func NewClient(dockerHost string, tlsConfig *tls.Config) DockerClient {
+	httpClient := &http.Client{
 		Transport: &http.Transport{
 			TLSClientConfig: tlsConfig,
 		},
@@ -31,14 +39,49 @@ func NewClient(dockerHost string, tlsConfig *tls.Config) Client {
 	if tmpStr := os.Getenv("DOCKER_API_VERSION"); tmpStr != "" {
 		verStr = tmpStr
 	}
-	apiClient, err := engineapi.NewClient(dockerHost, verStr, client, nil)
+	defaultHeaders := map[string]string{"User-Agent": "microci"}
+	httpClient = nil
+	apiClient, err := client.NewClient(dockerHost, verStr, httpClient, defaultHeaders)
 	if err != nil {
 		log.Fatalf("Error instantiating Docker engine-api: %s", err)
 	}
 
-	return dockerClient{apiClient: apiClient}
+	return dockerAPI{apiClient: apiClient}
 }
 
-type dockerClient struct {
-	apiClient engineapi.ContainerAPIClient
+type dockerAPI struct {
+	apiClient *client.Client
+}
+
+func (api dockerAPI) BuildImage(ctx context.Context, cloneURL, ref, name, tag string) (io.ReadCloser, error) {
+	// set build options
+	var options types.ImageBuildOptions
+	options.RemoteContext = cloneURL + "#" + ref
+	options.ForceRemove = true
+	options.Tags = []string{name + ":" + tag}
+	log.Debugf("Building Docker image with options: %+v", options)
+	// execute build
+	buildResponse, err := api.apiClient.ImageBuild(ctx, nil, options)
+	if err != nil {
+		fmt.Printf("%s", err.Error())
+		return nil, err
+	}
+	response, err := ioutil.ReadAll(buildResponse.Body)
+	if err != nil {
+		fmt.Printf("%s", err.Error())
+	}
+	fmt.Println(string(response))
+	return buildResponse.Body, nil
+}
+
+func (api dockerAPI) Info(ctx context.Context) (string, error) {
+	info, err := api.apiClient.Info(ctx)
+	if err != nil {
+		return "", err
+	}
+	jsonInfo, err := json.Marshal(&info)
+	if err != nil {
+		return "", err
+	}
+	return string(jsonInfo), nil
 }
