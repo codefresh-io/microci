@@ -3,7 +3,7 @@
 .dist
 .glide
 .idea
-.vscode
+.vscode/*
 vendor
 server/debug
 
