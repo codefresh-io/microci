@@ -1,6 +1,6 @@
 .git
 .cover
-.dist
+.dist/*
 .glide
 .idea
 .vscode/*
