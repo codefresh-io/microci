@@ -1,8 +1,19 @@
 .git
-.cover/
-.dist/
-.glide/
-.idea/
-.vscode/
-server/debug
 
+# Coverage reports
+.cover/
+
+# Compilation artifacts
+.dist/
+
+# Project-local glide cache, RE: https://github.com/Masterminds/glide/issues/736
+.glide/
+
+# Gogland IDE settings
+.idea/
+
+# VS Code settings
+.vscode/
+
+# debug output
+server/debug
