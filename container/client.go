@@ -5,18 +5,11 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"io"
-	"net/http"
-	"os"
 
 	log "github.com/Sirupsen/logrus"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/client"
-)
-
-const (
-	// DefaultAPIVersion default Docker API version (Remote API v1.29 == Docker v17.05)
-	DefaultAPIVersion = "v1.29"
 )
 
 // DockerClient interface
@@ -38,20 +31,7 @@ type BuildTarget struct {
 // NewClient returns a new Client instance which can be used to interact with
 // the Docker API.
 func NewClient(dockerHost string, tlsConfig *tls.Config) DockerClient {
-	var httpClient *http.Client
-	if tlsConfig != nil {
-		httpClient = &http.Client{
-			Transport: &http.Transport{
-				TLSClientConfig: tlsConfig,
-			},
-		}
-	}
-	verStr := DefaultAPIVersion
-	if tmpStr := os.Getenv("DOCKER_API_VERSION"); tmpStr != "" {
-		verStr = tmpStr
-	}
-	defaultHeaders := map[string]string{"User-Agent": "microci"}
-	apiClient, err := client.NewClient(dockerHost, verStr, httpClient, defaultHeaders)
+	apiClient, err := client.NewEnvClient()
 	if err != nil {
 		log.Fatalf("Error instantiating Docker engine-api: %s", err)
 	}

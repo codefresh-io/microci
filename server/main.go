@@ -57,12 +57,6 @@ func init() {
 }
 
 func main() {
-	rootCertPath := "/etc/ssl/docker"
-
-	if os.Getenv("DOCKER_CERT_PATH") != "" {
-		rootCertPath = os.Getenv("DOCKER_CERT_PATH")
-	}
-
 	app := cli.NewApp()
 	app.Name = "MicroCI"
 	app.Version = HumanVersion
@@ -112,36 +106,6 @@ func main() {
 		},
 	}
 	app.Flags = []cli.Flag{
-		cli.StringFlag{
-			Name:   "host, H",
-			Usage:  "daemon socket to connect to",
-			Value:  "unix:///var/run/docker.sock",
-			EnvVar: "DOCKER_HOST",
-		},
-		cli.BoolFlag{
-			Name:  "tls",
-			Usage: "use TLS; implied by --tlsverify",
-		},
-		cli.BoolFlag{
-			Name:   "tlsverify",
-			Usage:  "use TLS and verify the remote",
-			EnvVar: "DOCKER_TLS_VERIFY",
-		},
-		cli.StringFlag{
-			Name:  "tlscacert",
-			Usage: "trust certs signed only by this CA",
-			Value: fmt.Sprintf("%s/ca.pem", rootCertPath),
-		},
-		cli.StringFlag{
-			Name:  "tlscert",
-			Usage: "client certificate for TLS authentication",
-			Value: fmt.Sprintf("%s/cert.pem", rootCertPath),
-		},
-		cli.StringFlag{
-			Name:  "tlskey",
-			Usage: "client key for TLS authentication",
-			Value: fmt.Sprintf("%s/key.pem", rootCertPath),
-		},
 		cli.BoolFlag{
 			Name:  "debug",
 			Usage: "enable debug mode with verbose logging",
