@@ -28,7 +28,10 @@ const (
 var (
 	gClient         container.DockerClient
 	gStopChan       chan bool
+	gSlackToken     string
+	gSlackChannel   string
 	gCancelCommands []interface{}
+	gNotify         container.BuildNotify
 )
 
 var (
@@ -83,10 +86,20 @@ func main() {
 					Usage: "port the webhook should serve hooks on",
 					Value: 9000,
 				},
+				cli.StringFlag{
+					Name:        "slack-token",
+					Usage:       "Slack API token",
+					Destination: &gSlackToken,
+				},
+				cli.StringFlag{
+					Name:        "slack-channel",
+					Usage:       "Slack channel to post build results",
+					Destination: &gSlackChannel,
+				},
 			},
 			Usage:       "start webhook server",
 			ArgsUsage:   "configuration file",
-			Description: "start webhook server to handle Push events coming from GitHub",
+			Description: "start webhook server to handle webhook events from GitHub",
 			Action:      webhookServer,
 			Before:      beforeCommand,
 		},
@@ -160,12 +173,18 @@ func before(c *cli.Context) error {
 	if err != nil {
 		return err
 	}
+
 	// create new Docker client
 	gClient = container.NewClient(c.GlobalString("host"), tls)
-	// create new Chaos instance
-	//chaos = action.NewChaos()
-	// habdle termination signal
 
+	// set global Notify object to Slack or STDOUT
+	if gSlackToken != "" {
+		gNotify = SlackNotify{}
+	} else {
+		gNotify = StdoutNotify{}
+	}
+
+	// handle stop signals
 	handleSignals()
 	return nil
 }
@@ -187,7 +206,7 @@ func handleSignals() {
 			log.Debug("Canceling running command")
 			cancelFn.(context.CancelFunc)()
 		}
-		log.Debug("Graceful exit :-)")
+		fmt.Println("Graceful exit :-)")
 		os.Exit(0)
 	}()
 }
@@ -253,6 +272,8 @@ func webhookServer(c *cli.Context) {
 	secret := c.String("secret")
 	// get port
 	port := c.Int("port")
+	// print status
+	fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
 	// create new webhook
 	hook := github.New(&github.Config{Secret: secret})
 	// register push event handler

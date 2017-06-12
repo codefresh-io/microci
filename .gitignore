@@ -5,4 +5,5 @@
 .idea
 .vscode
 vendor
+server/debug
 

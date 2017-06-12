@@ -32,7 +32,7 @@ func handlePushEvent(payload interface{}, header webhooks.Header) {
 	// do build
 	ctx, cancel := context.WithCancel(context.Background())
 	gCancelCommands = append(gCancelCommands, cancel)
-	go gClient.BuildImage(ctx, cloneURL, ref, name, tag)
+	go gClient.BuildImage(ctx, cloneURL, ref, name, tag, gNotify)
 }
 
 // handleCreateEvent handles GitHub create events
@@ -54,6 +54,6 @@ func handleCreateEvent(payload interface{}, header webhooks.Header) {
 		// build
 		ctx, cancel := context.WithCancel(context.Background())
 		gCancelCommands = append(gCancelCommands, cancel)
-		go gClient.BuildImage(ctx, cloneURL, ref, name, ref)
+		go gClient.BuildImage(ctx, cloneURL, ref, name, ref, gNotify)
 	}
 }
