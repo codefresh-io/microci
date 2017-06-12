@@ -9,7 +9,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codefresh-io/microci/container"
 )
 
 // Line single line text
@@ -22,7 +21,7 @@ type StdoutNotify struct {
 }
 
 // SendBuildReport stream build output to STDOUT
-func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, target container.BuildTarget) {
+func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, target BuildTarget) {
 	defer r.Close()
 	// print build status
 	fmt.Println("===== New Build =====")

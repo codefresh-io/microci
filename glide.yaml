@@ -1,0 +1,12 @@
+package: github.com/codefresh-io/microci
+import:
+- package: github.com/Sirupsen/logrus
+- package: github.com/docker/docker
+  subpackages:
+  - api/types
+  - client
+- package: github.com/nlopes/slack
+- package: github.com/urfave/cli
+- package: gopkg.in/go-playground/webhooks.v3
+  subpackages:
+  - github

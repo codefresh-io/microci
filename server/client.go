@@ -1,4 +1,4 @@
-package container
+package main
 
 import (
 	"context"
@@ -17,10 +17,12 @@ type DockerClient interface {
 	Info(ctx context.Context) (string, error)
 }
 
+// BuildNotify interface
 type BuildNotify interface {
 	SendBuildReport(ctx context.Context, readCloser io.ReadCloser, target BuildTarget)
 }
 
+// BuildTarget build target details
 type BuildTarget struct {
 	Name       string
 	Tag        string

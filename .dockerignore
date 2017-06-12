@@ -4,6 +4,3 @@
 .idea
 .cover
 .vscode
-deploy
-vendor
-server/debug

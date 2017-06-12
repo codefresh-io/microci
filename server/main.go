@@ -13,8 +13,6 @@ import (
 
 	"gopkg.in/go-playground/webhooks.v3"
 	"gopkg.in/go-playground/webhooks.v3/github"
-
-	"github.com/codefresh-io/microci/container"
 )
 
 const (
@@ -22,12 +20,12 @@ const (
 )
 
 var (
-	gClient         container.DockerClient
+	gClient         DockerClient
 	gStopChan       chan bool
 	gSlackToken     string
 	gSlackChannel   string
 	gCancelCommands []interface{}
-	gNotify         container.BuildNotify
+	gNotify         BuildNotify
 )
 
 var (
@@ -145,7 +143,7 @@ func before(c *cli.Context) error {
 	}
 
 	// create new Docker client
-	gClient = container.NewClient()
+	gClient = NewClient()
 
 	// handle stop signals
 	handleSignals()

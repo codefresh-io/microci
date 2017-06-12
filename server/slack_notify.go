@@ -9,7 +9,6 @@ import (
 	"time"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/codefresh-io/microci/container"
 	"github.com/nlopes/slack"
 )
 
@@ -18,7 +17,7 @@ type SlackNotify struct {
 }
 
 // SendBuildReport send build output to slack channel
-func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, target container.BuildTarget) {
+func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, target BuildTarget) {
 	defer r.Close()
 
 	// format build report message
