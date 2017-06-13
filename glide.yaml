@@ -1,4 +1,11 @@
 package: github.com/codefresh-io/microci
+homepage: https://github.com/codefresh-io/microci
+license: Apache
+owners:
+- name: Alexei Ledenev
+  email: alexei.led@gmail.com
+ignore:
+- sort
 import:
 - package: github.com/Sirupsen/logrus
 - package: github.com/docker/docker
