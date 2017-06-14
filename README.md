@@ -37,6 +37,8 @@ The Docker container technology simplifies build, deployment and operation of Mi
 3. **Deploy** - `docker push` to Docker Registry (private, public)
 4. **Notify** - send build report (status, duration, output, etc.) to STDOUT/Slack/WebHook
 
+![MicroCI Pipeline](img/microci.png)
+
 ## Installation 
 
 *MicroCI* is available as a single binary for every platform (Linux, Mac and Windows). It's statically linked without any external dependency. 
