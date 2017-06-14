@@ -1,0 +1,12 @@
+version: '1.0'
+
+steps:
+
+  multistage-build:
+    type: build
+    description: create MicroCI image with multi-stage build
+    dockerfile: Dockerfile
+    working-directory: ${{main_clone}}
+    image-name: codefreshio/microci
+    build_arguments:
+      - GH_SHA=${{CF_REVISION}}
