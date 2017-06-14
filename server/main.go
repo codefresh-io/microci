@@ -146,13 +146,12 @@ func before(c *cli.Context) error {
 	gClient = NewClient()
 
 	// handle stop signals
-	handleSignals()
+	handleSignals(make(chan os.Signal, 1), true)
 	return nil
 }
 
-func handleSignals() {
+func handleSignals(sigs chan os.Signal, exitOnSignal bool) {
 	// Graceful shut-down on SIGINT/SIGTERM
-	sigs := make(chan os.Signal, 1)
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
 	// channel to notify long running commands to stop and cleanup
@@ -168,7 +167,9 @@ func handleSignals() {
 			cancelFn.(context.CancelFunc)()
 		}
 		fmt.Println("\nGracefully exiting :-)")
-		os.Exit(0)
+		if exitOnSignal {
+			os.Exit(0)
+		}
 	}()
 }
 

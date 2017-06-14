@@ -13,7 +13,7 @@ profile="$COVER/cover.out"
 mode=count
 
 generate_cover_data() {
-  [ -d "${COVER}" ] && rm -rf "${COVER}/*"
+  [ -d "${COVER}" ] && rm -rf "${COVER:?}/*"
   [ -d "${COVER}" ] || mkdir -p "${COVER}"
 
   for pkg in "$@"; do
@@ -33,5 +33,5 @@ show_cover_report() {
   go tool cover -${1}="$profile" -o "${COVER}/coverage.html"
 }
 
-generate_cover_data $(go list ./... | grep -v vendor)
+generate_cover_data "$(go list ./... | grep -v vendor)"
 show_cover_report html
