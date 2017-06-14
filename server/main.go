@@ -58,10 +58,14 @@ func main() {
 	app.Description = `
 MicroCI is a minimalistic Continuous Integration (CI) tool designed and tuned for Docker-based microservices.
 
+                   _ ___ 
+  |\/| o  _ ._ _  /   |  
+  |  | | (_ | (_) \_ _|_ 
+                        
         .
        ":"
-     ___:_____     |"\/"|
-   ,'         \.    \  /
+     ___:_____    |"\/"|
+   ,'         \    \  /
    |  O        \___/  |
  ~^~^~^~^~^~^~^~^~^~^~^~^~
  

@@ -1,5 +1,19 @@
 # MicroCI
 
+```
+                   _ ___ 
+  |\/| o  _ ._ _  /   |  
+  |  | | (_ | (_) \_ _|_ 
+                        
+        .
+       ":"
+     ___:_____     |"\/"|
+   ,'         \.    \  /
+   |  O        \___/  |
+ ~^~^~^~^~^~^~^~^~^~^~^~^~
+ 
+```
+
 ## What is MicroCI
 
 *MicroCI* is minimalistic Continuous Integration (CI) tool, that implements a super simple CI pipeline for Docker-based microservices.
