@@ -10,3 +10,8 @@ steps:
     image-name: codefreshio/microci
     build_arguments:
       - GH_SHA=${{CF_REVISION}}
+
+  dockerhub-push:
+    type: push
+    candidate: ${{build_step_name}}
+    tag: latest
