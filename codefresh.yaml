@@ -13,5 +13,5 @@ steps:
 
   dockerhub-push:
     type: push
-    candidate: ${{build_step_name}}
+    candidate: ${{build}}
     tag: latest
