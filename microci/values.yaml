@@ -5,7 +5,7 @@ replicaCount: 1
 image:
   repository: codefreshio/microci
   tag: latest
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 service:
   name: microci
   type: NodePort
@@ -21,7 +21,7 @@ ingress:
   hosts:
     - chart-dev.local
   annotations:
-    kubernetes.io/ingress.class: nginx
+    # kubernetes.io/ingress.class: nginx
     # kubernetes.io/tls-acme: "true"
   tls:
     # Secrets must be manually created in the namespace.
@@ -30,9 +30,9 @@ ingress:
     #     - chart-example.local
 resources:
   limits:
-    cpu: 100m
-    memory: 512Mi
+    cpu: 500m
+    memory: 1024M
   requests:
-    cpu: 100m
-    memory: 512Mi
+    cpu: 200m
+    memory: 256M
 
