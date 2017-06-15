@@ -6,7 +6,7 @@ FROM golang:1.8-alpine AS builder
 # gox - Go cross compile tool
 # github-release - Github Release and upload artifacts
 # go-junit-report - convert Go test into junit.xml format
-RUN apk add --no-cache git && \
+RUN apk add --no-cache git bash curl && \
     go get -v github.com/mitchellh/gox && \
     go get -v github.com/aktau/github-release && \
     go get -v github.com/jstemmer/go-junit-report
@@ -18,11 +18,12 @@ WORKDIR /go/src/github.com/codefresh-io/microci
 # copy sources
 COPY . .
 
-# build microci binary
-RUN sh -c 'VERSION=$(cat VERSION) script/go_build.sh'
+# run test and calculate coverage
+RUN bash -c 'VERSION=$(cat VERSION) script/coverage.sh' && bash <(curl -s https://codecov.io/bash)
 
-# runt test and generate coverage report
-# RUN script/coverage.sh
+# build microci binary
+RUN bassh -c 'VERSION=$(cat VERSION) script/go_build.sh'
+
 
 #
 # ------ MicroCI runtime image ------
