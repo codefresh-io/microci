@@ -1,0 +1,9 @@
+apiVersion: v1  
+kind: Secret  
+metadata:  
+  name: slack
+  annotations:
+    "helm.sh/resource-policy": keep
+type: Opaque  
+data:  
+  apiKey: {{ .Values.secret.slackApiKey }}

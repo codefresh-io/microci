@@ -1,0 +1,9 @@
+apiVersion: v1  
+kind: Secret  
+metadata:  
+  name: github
+  annotations:
+    "helm.sh/resource-policy": keep
+type: Opaque  
+data:  
+  webhookSecret: {{ .Values.secret.githubWebhookSecret }}

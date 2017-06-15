@@ -1,0 +1,42 @@
+apiVersion: extensions/v1beta1
+kind: Deployment
+metadata:
+  name: {{ template "fullname" . }}
+  labels:
+    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  template:
+    metadata:
+      labels:
+        app: {{ template "fullname" . }}
+    spec:
+      containers:
+      - name: {{ .Chart.Name }}
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        command: ["microci"]
+        args: ["--debug", "server", "--secret", "$(GH_WH_SECRET)", "--slack-token", "$(SLACK_API_KEY)", "--slack-channel", "{{ .Values.service.slackChannel }}"]
+        env:
+        - name: GH_WH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: github
+              key: webhookSecret
+        - name: SLACK_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: slack
+              key: apiKey
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.service.internalPort }}
+        livenessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.service.internalPort }}
+        readinessProbe:
+          httpGet:
+            path: /
+            port: {{ .Values.service.internalPort }}
+        resources:
+{{ toYaml .Values.resources | indent 10 }}

@@ -1,0 +1,16 @@
+name: microci
+version: 0.1.0
+description: MicroCI minimalistic CI for Docker containers
+home: https://github.com/codefresh-io/microci
+icon: https://image.ibb.co/bAdk8Q/micro_whale.jpg
+sources:
+  - https://github.com/codefresh-io/microci
+keywords:
+  - ci
+  - microci
+  - docker
+  - continuous-integration
+maintainers:
+- name: Alexei Ledenev
+  email: alexei.led@gmail.com
+
