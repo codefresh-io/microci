@@ -1,6 +1,7 @@
 {{- if .Values.ingress.enabled -}}
 {{- $serviceName := include "fullname" . -}}
 {{- $servicePort := .Values.service.externalPort -}}
+{{- $servicePath := .Values.service.name -}}
 apiVersion: extensions/v1beta1
 kind: Ingress
 metadata:
@@ -20,7 +21,7 @@ spec:
     - host: {{ $host }}
       http:
         paths:
-          - path: /
+          - path: /{{ $servicePath }}
             backend:
               serviceName: {{ $serviceName }}
               servicePort: {{ $servicePort }}
