@@ -18,11 +18,17 @@ WORKDIR /go/src/github.com/codefresh-io/microci
 # copy sources
 COPY . .
 
+# set entrypoint to bash
+ENTRYPOINT ["/bin/bash"]
+
 # run test and calculate coverage
-RUN bash -c 'VERSION=$(cat VERSION) script/coverage.sh' && bash <(curl -s https://codecov.io/bash)
+RUN VERSION=$(cat VERSION) script/coverage.sh
+# upload coverage reports to Codecov.io: pass CODECOV_TOKEN as build-arg
+ARG CODECOV_TOKEN
+RUN bash -c "bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN}"
 
 # build microci binary
-RUN bassh -c 'VERSION=$(cat VERSION) script/go_build.sh'
+RUN VERSION=$(cat VERSION) script/go_build.sh
 
 
 #
