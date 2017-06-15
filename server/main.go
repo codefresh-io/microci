@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
@@ -11,7 +12,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/urfave/cli"
 
-	"gopkg.in/go-playground/webhooks.v3"
 	"gopkg.in/go-playground/webhooks.v3/github"
 )
 
@@ -201,13 +201,30 @@ func webhookServer(c *cli.Context) {
 	// print status
 	fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
 	// create new webhook
-	hook := github.New(&github.Config{Secret: secret})
+	githubHook := github.New(&github.Config{Secret: secret})
 	// register push event handler
-	hook.RegisterEvents(handlePushEvent, github.PushEvent)
+	githubHook.RegisterEvents(handlePushEvent, github.PushEvent)
 	// register create event handler
-	hook.RegisterEvents(handleCreateEvent, github.CreateEvent)
-	// start webhook server
-	err := webhooks.Run(hook, ":"+strconv.Itoa(port), gitHubPath)
+	githubHook.RegisterEvents(handleCreateEvent, github.CreateEvent)
+
+	// create HTTP server
+	srv := http.NewServeMux()
+
+	// handle github webhooks
+	srv.HandleFunc(gitHubPath, func(w http.ResponseWriter, r *http.Request) {
+		githubHook.ParsePayload(w, r)
+	})
+
+	// handle stats
+	srv.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "MicroCI Status Page ...")
+	})
+
+	srv.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "MicroCI is up and running")
+	})
+
+	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
 	if err != nil {
 		log.Error(err)
 	}
