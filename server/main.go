@@ -43,6 +43,19 @@ var (
 
 	// HumanVersion is a human readable app version
 	HumanVersion = fmt.Sprintf("%s - %.7s (%s) %s", Version, GitCommit, GitBranch, BuildTime)
+
+	AsciiLogo = `
+                   _ ___ 
+  |\/| o  _ ._ _  /   |  
+  |  | | (_ | (_) \_ _|_ 
+                        
+        .
+       ":"
+     ___:_____    |"\/"|
+   ,'         \    \  /
+   |  O        \___/  |
+ ~^~^~^~^~^~^~^~^~^~^~^~^~
+ `
 )
 
 func init() {
@@ -55,27 +68,16 @@ func main() {
 	app.Name = "MicroCI"
 	app.Version = HumanVersion
 	app.Usage = "Minimalistic CI tool for Docker"
-	app.Description = `
+	app.Description = fmt.Sprintf(`
 MicroCI is a minimalistic Continuous Integration (CI) tool designed and tuned for Docker-based microservices.
-
-                   _ ___ 
-  |\/| o  _ ._ _  /   |  
-  |  | | (_ | (_) \_ _|_ 
-                        
-        .
-       ":"
-     ___:_____    |"\/"|
-   ,'         \    \  /
-   |  O        \___/  |
- ~^~^~^~^~^~^~^~^~^~^~^~^~
- 
+%s
  MicroCI respects DOCKER environment variables:
    - DOCKER_HOST        - set the url to the docker serve (default unix:///var/run/docker.sock)
    - DOCKER_API_VERSION - set the version of the API to reach
    - DOCKER_CERT_PATH   - path to load the TLS certificates from
    - DOCKER_TLS_VERIFY  - enable or disable TLS verification, off by default
    
-Copyright © Codefresh.io`
+Copyright © Codefresh.io`, AsciiLogo)
 	app.Before = before
 	app.Commands = []cli.Command{
 		{
@@ -224,11 +226,13 @@ func webhookServer(c *cli.Context) {
 
 	// handle stats
 	srv.HandleFunc(path+"/status", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "MicroCI Status Page ...")
+		fmt.Fprintln(w, "MicroCI Status Page")
+		fmt.Fprintln(w, "===================")
+		fmt.Fprintln(w, "Under Construction ...")
 	})
 
 	srv.HandleFunc(path+"/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "MicroCI is up and running")
+		fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, AsciiLogo)
 	})
 
 	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
