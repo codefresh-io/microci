@@ -92,11 +92,6 @@ Copyright © Codefresh.io`, AsciiLogo)
 					Usage: "ip the webhook should serve hooks on",
 					Value: "0.0.0.0",
 				},
-				cli.StringFlag{
-					Name:  "path",
-					Usage: "service URL path, when deployed on server",
-					Value: "/microci",
-				},
 				cli.IntFlag{
 					Name:  "port, p",
 					Usage: "port the webhook should serve hooks on",
@@ -196,8 +191,6 @@ func webhookServer(c *cli.Context) {
 	secret := c.String("secret")
 	// get port
 	port := c.Int("port")
-	// get service URL path: prefix to add to served URLs
-	path := c.String("path")
 	// get slack token and channel
 	gSlackToken = c.String("slack-token")
 	gSlackChannel = c.String("slack-channel")
@@ -220,18 +213,18 @@ func webhookServer(c *cli.Context) {
 	srv := http.NewServeMux()
 
 	// handle github webhooks
-	srv.HandleFunc(path+gitHubPath, func(w http.ResponseWriter, r *http.Request) {
+	srv.HandleFunc(gitHubPath, func(w http.ResponseWriter, r *http.Request) {
 		githubHook.ParsePayload(w, r)
 	})
 
 	// handle stats
-	srv.HandleFunc(path+"/status", func(w http.ResponseWriter, r *http.Request) {
+	srv.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "MicroCI Status Page")
 		fmt.Fprintln(w, "===================")
 		fmt.Fprintln(w, "Under Construction ...")
 	})
 
-	srv.HandleFunc(path+"/", func(w http.ResponseWriter, r *http.Request) {
+	srv.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, AsciiLogo)
 	})
 
