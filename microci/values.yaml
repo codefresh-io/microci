@@ -8,7 +8,7 @@ image:
   pullPolicy: Always
 service:
   name: microci
-  type: NodePort
+  type: ClusterIP
   externalPort: 9000
   internalPort: 9000
   slackChannel: "pumba"
@@ -19,7 +19,7 @@ ingress:
   enabled: true
   # Used to create Ingress record (should used with service.type: ClusterIP).
   hosts:
-    - chart-dev.local
+    - microci.local
   annotations:
     kubernetes.io/ingress.class: nginx
     nginx.org/redirect-to-https: "false"
