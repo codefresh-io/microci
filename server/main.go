@@ -224,6 +224,12 @@ func webhookServer(c *cli.Context) {
 		fmt.Fprintln(w, "Under Construction ...")
 	})
 
+	srv.HandleFunc("/microci/status2", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "MicroCI Status2 Page")
+		fmt.Fprintln(w, "===================")
+		fmt.Fprintln(w, "Under Construction ...")
+	})
+
 	srv.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, AsciiLogo)
 	})
