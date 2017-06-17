@@ -93,11 +93,6 @@ Copyright © Codefresh.io`, AsciiLogo)
 					Usage: "ip the webhook should serve hooks on",
 					Value: "0.0.0.0",
 				},
-				cli.StringFlag{
-					Name:  "endpoint",
-					Usage: "service URI endpoint path ('/microci' by default)",
-					Value: "microci",
-				},
 				cli.IntFlag{
 					Name:  "port, p",
 					Usage: "port the webhook should serve hooks on",
@@ -198,7 +193,6 @@ func webhookServer(c *cli.Context) {
 	// get port
 	port := c.Int("port")
 	// get endpoint
-	endpoint := c.String("endpoint")
 	// get slack token and channel
 	gSlackToken = c.String("slack-token")
 	gSlackChannel = c.String("slack-channel")
@@ -221,19 +215,18 @@ func webhookServer(c *cli.Context) {
 	srv := http.NewServeMux()
 
 	// handle github webhooks
-	srv.HandleFunc(endpoint+gitHubPath, func(w http.ResponseWriter, r *http.Request) {
+	srv.HandleFunc(gitHubPath, func(w http.ResponseWriter, r *http.Request) {
 		githubHook.ParsePayload(w, r)
 	})
 
 	// handle stats
-	srv.HandleFunc(endpoint+"/report", func(w http.ResponseWriter, r *http.Request) {
+	srv.HandleFunc("/report", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, "MicroCI Report Page")
 		fmt.Fprintln(w, "===================")
 		fmt.Fprintln(w, "Under Construction ...")
 	})
 
 	srv.HandleFunc("/", statusHandler)
-	srv.HandleFunc(endpoint+"/", statusHandler)
 
 	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
 	if err != nil {
