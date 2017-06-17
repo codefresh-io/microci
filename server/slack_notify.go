@@ -53,7 +53,7 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 	// post Slack message
 	channelID, timestamp, err := api.PostMessage(gSlackChannel, output, params)
 	if err != nil {
-		fmt.Printf("%s\n", err)
+		log.Error(err)
 		return
 	}
 	log.Debugf("Message successfully sent to channel %s at %s", channelID, timestamp)

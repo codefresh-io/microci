@@ -21,6 +21,8 @@ spec:
         command: ["microci"]
         args: ["--debug", "server", "--secret", "$(GH_WH_SECRET)", "--slack-token", "$(SLACK_API_KEY)", "--slack-channel", "{{ .Values.service.slackChannel }}"]
         env:
+        - name: DOCKER_API_VERSION
+          value: "1.23"
         - name: GH_WH_SECRET
           valueFrom:
             secretKeyRef:

@@ -224,16 +224,8 @@ func webhookServer(c *cli.Context) {
 	})
 
 	// handle stats
-	srv.HandleFunc("/report", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "MicroCI Report Page")
-		fmt.Fprintln(w, "===================")
-		fmt.Fprintln(w, "Under Construction ...")
-	})
-	srv.HandleFunc("/microci/report", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "MicroCI Report Page")
-		fmt.Fprintln(w, "===================")
-		fmt.Fprintln(w, "Under Construction ...")
-	})
+	srv.HandleFunc("/report", reportHandler)
+	srv.HandleFunc("/microci/report", reportHandler)
 
 	srv.HandleFunc("/", statusHandler)
 	srv.HandleFunc("/microci/", statusHandler)
@@ -242,6 +234,12 @@ func webhookServer(c *cli.Context) {
 	if err != nil {
 		log.Error(err)
 	}
+}
+
+func reportHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "MicroCI Report Page")
+	fmt.Fprintln(w, "===================")
+	fmt.Fprintln(w, "Under Construction ...")
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {

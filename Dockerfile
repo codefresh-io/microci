@@ -36,6 +36,9 @@ RUN VERSION=$(cat VERSION) script/go_build.sh
 #
 FROM alpine:3.5
 
+# add root certificates
+RUN apk add --no-cache ca-certificates
+# add user:group
 RUN addgroup microci && adduser -s /bin/bash -D -G microci microci
 
 ENV GOSU_VERSION 1.10
