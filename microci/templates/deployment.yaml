@@ -11,6 +11,10 @@ spec:
       labels:
         app: {{ template "fullname" . }}
     spec:
+      volumes:
+      - name: var-run-docker-sock
+        hostPath:
+          path: /var/run/docker.sock
       containers:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
@@ -38,5 +42,8 @@ spec:
           httpGet:
             path: /
             port: {{ .Values.service.internalPort }}
+        volumeMounts:
+        - name: var-run-docker-sock
+          mountPath: /var/run/docker.sock
         resources:
 {{ toYaml .Values.resources | indent 10 }}
