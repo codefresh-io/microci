@@ -3,7 +3,7 @@ kind: Secret
 metadata:  
   name: github
   annotations:
-    "helm.sh/resource-policy": keep
+    # "helm.sh/resource-policy": keep
 type: Opaque  
 data:  
   webhookSecret: {{ .Values.secret.githubWebhookSecret }}

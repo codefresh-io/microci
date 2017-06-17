@@ -93,6 +93,11 @@ Copyright © Codefresh.io`, AsciiLogo)
 					Usage: "ip the webhook should serve hooks on",
 					Value: "0.0.0.0",
 				},
+				cli.StringFlag{
+					Name:  "endpoint",
+					Usage: "service URI endpoint path ('/microci' by default)",
+					Value: "microci",
+				},
 				cli.IntFlag{
 					Name:  "port, p",
 					Usage: "port the webhook should serve hooks on",
@@ -192,6 +197,8 @@ func webhookServer(c *cli.Context) {
 	secret := c.String("secret")
 	// get port
 	port := c.Int("port")
+	// get endpoint
+	endpoint := c.String("endpoint")
 	// get slack token and channel
 	gSlackToken = c.String("slack-token")
 	gSlackChannel = c.String("slack-channel")
@@ -214,19 +221,32 @@ func webhookServer(c *cli.Context) {
 	srv := http.NewServeMux()
 
 	// handle github webhooks
-	srv.HandleFunc(gitHubPath, func(w http.ResponseWriter, r *http.Request) {
+	srv.HandleFunc(endpoint+gitHubPath, func(w http.ResponseWriter, r *http.Request) {
 		githubHook.ParsePayload(w, r)
 	})
 
 	// handle stats
-	srv.HandleFunc("/status", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "MicroCI Status Page")
+	srv.HandleFunc(endpoint+"/report", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "MicroCI Report Page")
 		fmt.Fprintln(w, "===================")
 		fmt.Fprintln(w, "Under Construction ...")
 	})
 
-	srv.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, AsciiLogo)
+	srv.HandleFunc("/", statusHandler)
+	srv.HandleFunc(endpoint+"/", statusHandler)
+
+	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
+	if err != nil {
+		log.Error(err)
+	}
+}
+
+func statusHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, AsciiLogo)
+	// debug request
+	queryValues := r.URL.Query()
+	if queryValues.Get("debug") == "true" {
+		fmt.Fprint(w, "\n\n\n")
 		fmt.Fprintln(w, "Debug request:")
 		fmt.Fprintln(w, "==============")
 		// Save a copy of this request for debugging.
@@ -235,11 +255,6 @@ func webhookServer(c *cli.Context) {
 			fmt.Println(err)
 		}
 		fmt.Fprintln(w, string(requestDump))
-	})
-
-	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
-	if err != nil {
-		log.Error(err)
 	}
 }
 
