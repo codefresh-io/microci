@@ -218,6 +218,10 @@ func webhookServer(c *cli.Context) {
 	srv.HandleFunc(gitHubPath, func(w http.ResponseWriter, r *http.Request) {
 		githubHook.ParsePayload(w, r)
 	})
+	// handle github webhooks
+	srv.HandleFunc("/microci"+gitHubPath, func(w http.ResponseWriter, r *http.Request) {
+		githubHook.ParsePayload(w, r)
+	})
 
 	// handle stats
 	srv.HandleFunc("/report", func(w http.ResponseWriter, r *http.Request) {
@@ -225,8 +229,14 @@ func webhookServer(c *cli.Context) {
 		fmt.Fprintln(w, "===================")
 		fmt.Fprintln(w, "Under Construction ...")
 	})
+	srv.HandleFunc("/microci/report", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprintln(w, "MicroCI Report Page")
+		fmt.Fprintln(w, "===================")
+		fmt.Fprintln(w, "Under Construction ...")
+	})
 
 	srv.HandleFunc("/", statusHandler)
+	srv.HandleFunc("/microci/", statusHandler)
 
 	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
 	if err != nil {
