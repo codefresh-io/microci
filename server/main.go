@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"net/http/httputil"
 	"os"
 	"os/signal"
 	"strconv"
@@ -224,14 +225,16 @@ func webhookServer(c *cli.Context) {
 		fmt.Fprintln(w, "Under Construction ...")
 	})
 
-	srv.HandleFunc("/microci/status2", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprintln(w, "MicroCI Status2 Page")
-		fmt.Fprintln(w, "===================")
-		fmt.Fprintln(w, "Under Construction ...")
-	})
-
 	srv.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, AsciiLogo)
+		fmt.Fprintln(w, "Debug request:")
+		fmt.Fprintln(w, "==============")
+		// Save a copy of this request for debugging.
+		requestDump, err := httputil.DumpRequest(r, true)
+		if err != nil {
+			fmt.Println(err)
+		}
+		fmt.Fprintln(w, string(requestDump))
 	})
 
 	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
