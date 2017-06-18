@@ -13,7 +13,7 @@ service:
   internalPort: 9000
   slackChannel: "build"
   registryUser: "microcidemo"
-  registryRepository: "micocidemo"
+  registryRepository: "microcidemo"
   registryServer: ""
 secret:
   githubWebhookSecret: "Z2FpYS1naXRodWItc2VjcmV0"
