@@ -11,10 +11,14 @@ service:
   type: ClusterIP
   externalPort: 9000
   internalPort: 9000
-  slackChannel: "pumba"
+  slackChannel: "build"
+  registryUser: "microcidemo"
+  registryRepository: "micocidemo"
+  registryServer: ""
 secret:
   githubWebhookSecret: "Z2FpYS1naXRodWItc2VjcmV0"
-  slackApiKey: "eG94cC00NzM5NTE2OTc1LTQ3Mzk1MTY5OTEtNDQ3Nzk2NTQ2NjMtMGQ2MDFmMjlkMw=="
+  slackApiKey: "eG94cC0yMDAzMjc5OTQ3NDMtMTk5NDIxMzc1MDkxLTE5ODgzMDk1Mjg0OC1iOTE5MTA5ZGJiNWI2MTkzYzUxZjBkOGE3YTFlOGZlYQ=="
+  registryPassword: "Y2FtZV9yYW5jb3JfcHJpdmFjeV9kZWZyb2Nr"
 ingress:
   enabled: true
   # Used to create Ingress record (should used with service.type: ClusterIP).

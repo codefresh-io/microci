@@ -19,7 +19,7 @@ spec:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         command: ["microci"]
-        args: ["--debug", "server", "--secret", "$(GH_WH_SECRET)", "--slack-token", "$(SLACK_API_KEY)", "--slack-channel", "{{ .Values.service.slackChannel }}"]
+        args: ["--debug", "server", "--secret", "$(GH_WH_SECRET)", "--slack-token", "$(SLACK_API_KEY)", "--slack-channel", "{{ .Values.service.slackChannel }}", "--user", "{{ .Values.service.registryUser }}", "--password", "$(REGISTRY_PASSWORD)", "--repository", "{{ .Values.service.registryRepository }}", "--registry", "{{ .Values.service.registryServer }}"]
         env:
         - name: DOCKER_API_VERSION
           value: "1.23"
@@ -28,6 +28,11 @@ spec:
             secretKeyRef:
               name: github
               key: webhookSecret
+        - name: REGISTRY_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: registry
+              key: password
         - name: SLACK_API_KEY
           valueFrom:
             secretKeyRef:
