@@ -27,6 +27,8 @@ var (
 	gSlackChannel   string
 	gCancelCommands []interface{}
 	gNotify         BuildNotify
+	gRegistry       string
+	gRepository     string
 )
 
 var (
@@ -94,9 +96,25 @@ Copyright © Codefresh.io`, AsciiLogo)
 					Value: "0.0.0.0",
 				},
 				cli.IntFlag{
-					Name:  "port, p",
+					Name:  "port",
 					Usage: "port the webhook should serve hooks on",
 					Value: 9000,
+				},
+				cli.StringFlag{
+					Name:  "user, u",
+					Usage: "Docker Registry user",
+				},
+				cli.StringFlag{
+					Name:  "password, p",
+					Usage: "Docker Registry password",
+				},
+				cli.StringFlag{
+					Name:  "registry",
+					Usage: "Docker Registry (DockerHub by default)",
+				},
+				cli.StringFlag{
+					Name:  "repository",
+					Usage: "Docker Registry repository (default: VCS account name)",
 				},
 				cli.StringFlag{
 					Name:  "slack-token, t",
@@ -192,7 +210,6 @@ func webhookServer(c *cli.Context) {
 	secret := c.String("secret")
 	// get port
 	port := c.Int("port")
-	// get endpoint
 	// get slack token and channel
 	gSlackToken = c.String("slack-token")
 	gSlackChannel = c.String("slack-channel")
@@ -201,6 +218,16 @@ func webhookServer(c *cli.Context) {
 		gNotify = SlackNotify{}
 	} else {
 		gNotify = StdoutNotify{}
+	}
+	// login to registry if credentials are passed
+	user := c.String("user")
+	password := c.String("password")
+	gRegistry = c.String("registry")
+	gRepository = c.String("repository")
+	if user != "" && password != "" {
+		ctx, cancel := context.WithCancel(context.Background())
+		gCancelCommands = append(gCancelCommands, cancel)
+		gClient.RegistryLogin(ctx, user, password, gRegistry)
 	}
 	// print status
 	fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
@@ -237,9 +264,9 @@ func webhookServer(c *cli.Context) {
 }
 
 func reportHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "MicroCI Report Page")
-	fmt.Fprintln(w, "===================")
-	fmt.Fprintln(w, "Under Construction ...")
+	fmt.Fprintln(w, "MicroCI Build Reports")
+	fmt.Fprintln(w, "=====================")
+	fmt.Fprintln(w, gStats.GetStatsReport())
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {

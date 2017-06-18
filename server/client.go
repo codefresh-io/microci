@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"io"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 
@@ -13,13 +15,15 @@ import (
 
 // DockerClient interface
 type DockerClient interface {
-	BuildImage(ctx context.Context, cloneURL, ref, name, tag string, notify BuildNotify) error
+	RegistryLogin(ctx context.Context, user, password, registry string) error
+	BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag string, notify BuildNotify) error
 	Info(ctx context.Context) (string, error)
 }
 
 // BuildNotify interface
 type BuildNotify interface {
 	SendBuildReport(ctx context.Context, readCloser io.ReadCloser, target BuildTarget)
+	SendPushReport(ctx context.Context, readCloser io.ReadCloser, image string)
 }
 
 // BuildTarget build target details
@@ -37,19 +41,52 @@ func NewClient() DockerClient {
 		log.Fatalf("Error instantiating Docker engine-api: %s", err)
 	}
 
-	return dockerAPI{apiClient: apiClient}
+	return &dockerAPI{apiClient: apiClient}
 }
 
 type dockerAPI struct {
-	apiClient *client.Client
+	apiClient  *client.Client
+	authBase64 string
 }
 
-func (api dockerAPI) BuildImage(ctx context.Context, cloneURL, ref, name, tag string, notify BuildNotify) error {
+// Login to DockerRegistry
+func (api *dockerAPI) RegistryLogin(ctx context.Context, user, password, registry string) error {
+	auth := types.AuthConfig{
+		Username: user,
+		Password: password,
+	}
+	if registry != "" {
+		auth.ServerAddress = registry
+	}
+	authBytes, _ := json.Marshal(auth)
+	api.authBase64 = base64.URLEncoding.EncodeToString(authBytes)
+	_, err := api.apiClient.RegistryLogin(ctx, auth)
+	return err
+}
+
+func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag string, notify BuildNotify) error {
 	// set build options
 	var options types.ImageBuildOptions
 	options.RemoteContext = cloneURL + "#" + ref
 	options.ForceRemove = true
-	options.Tags = []string{name + ":" + tag}
+	// create name for image to build
+	var imageName string
+	if gRegistry != "" {
+		imageName += gRegistry + "/"
+	}
+	if gRepository != "" {
+		imageName += gRepository + "/" + name
+	} else {
+		imageName += fullname
+	}
+	// get branch fro ref (if branch) or tag
+	refs := strings.Split(ref, "/")
+	tagText := refs[len(refs)-1]
+	// prepare 2 tags
+	// - one tag with commit
+	// - one tag with branch
+	options.Tags = []string{imageName + ":" + tagText, imageName + ":" + tag}
+	// debug build options
 	log.Debugf("Building Docker image with options: %+v", options)
 	// execute build
 	buildResponse, err := api.apiClient.ImageBuild(ctx, nil, options)
@@ -64,12 +101,27 @@ func (api dockerAPI) BuildImage(ctx context.Context, cloneURL, ref, name, tag st
 	buildTarget.Name = name
 	buildTarget.Tag = tag
 
-	// send output and status
+	// send build output and status
 	notify.SendBuildReport(ctx, buildResponse.Body, buildTarget)
+
+	// push new image
+	pushOptions := types.ImagePushOptions{}
+	pushOptions.RegistryAuth = api.authBase64
+	for _, image := range options.Tags {
+		pushResponse, err := api.apiClient.ImagePush(ctx, image, pushOptions)
+		// get push error
+		if err != nil {
+			log.Error(err)
+			return err
+		}
+		// send output and status
+		notify.SendPushReport(ctx, pushResponse, image)
+	}
 	return nil
 }
 
-func (api dockerAPI) Info(ctx context.Context) (string, error) {
+// Info get Docker info
+func (api *dockerAPI) Info(ctx context.Context) (string, error) {
 	info, err := api.apiClient.Info(ctx)
 	if err != nil {
 		return "", err

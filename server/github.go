@@ -24,15 +24,11 @@ func handlePushEvent(payload interface{}, header webhooks.Header) {
 	ref := strings.TrimPrefix(pl.Ref, "refs/heads/")
 	// get clone URL
 	cloneURL := pl.Repository.CloneURL
-	// get repo full name and use it as image name
-	name := pl.Repository.FullName
-	// get HEAD commit
-	tag := pl.HeadCommit.ID
 
 	// do build
 	ctx, cancel := context.WithCancel(context.Background())
 	gCancelCommands = append(gCancelCommands, cancel)
-	go gClient.BuildImage(ctx, cloneURL, ref, name, tag, gNotify)
+	go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, pl.HeadCommit.ID, gNotify)
 }
 
 // handleCreateEvent handles GitHub create events
@@ -49,11 +45,9 @@ func handleCreateEvent(payload interface{}, header webhooks.Header) {
 	if pl.RefType == "branch" || pl.RefType == "tag" {
 		ref := pl.Ref
 		cloneURL := pl.Repository.CloneURL
-		// get repo full name and use it as image name
-		name := pl.Repository.FullName
 		// build
 		ctx, cancel := context.WithCancel(context.Background())
 		gCancelCommands = append(gCancelCommands, cancel)
-		go gClient.BuildImage(ctx, cloneURL, ref, name, ref, gNotify)
+		go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, ref, gNotify)
 	}
 }
