@@ -51,17 +51,20 @@ type dockerAPI struct {
 
 // Login to DockerRegistry
 func (api *dockerAPI) RegistryLogin(ctx context.Context, user, password, registry string) error {
-	auth := types.AuthConfig{
-		Username: user,
-		Password: password,
+	if user != "" && password != "" {
+		auth := types.AuthConfig{
+			Username: user,
+			Password: password,
+		}
+		if registry != "" {
+			auth.ServerAddress = registry
+		}
+		authBytes, _ := json.Marshal(auth)
+		api.authBase64 = base64.URLEncoding.EncodeToString(authBytes)
+		_, err := api.apiClient.RegistryLogin(ctx, auth)
+		return err
 	}
-	if registry != "" {
-		auth.ServerAddress = registry
-	}
-	authBytes, _ := json.Marshal(auth)
-	api.authBase64 = base64.URLEncoding.EncodeToString(authBytes)
-	_, err := api.apiClient.RegistryLogin(ctx, auth)
-	return err
+	return nil
 }
 
 func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag string, notify BuildNotify) error {
@@ -104,18 +107,20 @@ func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, f
 	// send build output and status
 	notify.SendBuildReport(ctx, buildResponse.Body, buildTarget)
 
-	// push new image
-	pushOptions := types.ImagePushOptions{}
-	pushOptions.RegistryAuth = api.authBase64
-	for _, image := range options.Tags {
-		pushResponse, err := api.apiClient.ImagePush(ctx, image, pushOptions)
-		// get push error
-		if err != nil {
-			log.Error(err)
-			return err
+	// push new image, if registry authBase64 is not nil (credentials specified)
+	if api.authBase64 != "" {
+		pushOptions := types.ImagePushOptions{}
+		pushOptions.RegistryAuth = api.authBase64
+		for _, image := range options.Tags {
+			pushResponse, err := api.apiClient.ImagePush(ctx, image, pushOptions)
+			// get push error
+			if err != nil {
+				log.Error(err)
+				return err
+			}
+			// send output and status
+			notify.SendPushReport(ctx, pushResponse, image)
 		}
-		// send output and status
-		notify.SendPushReport(ctx, pushResponse, image)
 	}
 	return nil
 }

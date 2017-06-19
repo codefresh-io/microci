@@ -2,9 +2,9 @@
 
 - [ ] Emit WebHook POST with Build Results
 - [ ] Explore Huginn Integration platform: covert WebHook to Slack, Push, email, S3, etc. Need one-to-many notification.
-- [ ] Push Docker image to Docker Registry
+- [X] ~~*Push Docker image to Docker Registry*~~
 - [ ] Explore docker/cliconfig package for "reusing" already stored credentials or Docker config files
-- [ ] Decide on build status: Passed/Failed
+- [X] ~~*Decide on build status: Passed/Failed*~~
 - [ ] Get BitBucket/GitLab webhooks (another URI path)
 - [ ] Explore IFTTT and Zappier for easier integration (WebHook to Other) - write guide
 - [ ] Remove Slack notification if flavour of webhook

@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"regexp"
 	"time"
 
 	log "github.com/Sirupsen/logrus"
@@ -31,6 +32,9 @@ func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, ta
 	fmt.Printf("Building %s:%s\n", target.Name, target.Tag)
 	fmt.Printf("From git context: %s\n", target.GitContext)
 	buildReport.Start = time.Now()
+	// regexp to decide on build status: FAILED by default
+	re := regexp.MustCompile("Successfully built ([0-9a-f]{12})")
+	buildReport.Status = "FAILED"
 	// stream build output
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -41,17 +45,22 @@ func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, ta
 			break
 		}
 		fmt.Print(line.Stream)
+		status := re.FindString(line.Stream)
+		if status != "" {
+			buildReport.Status = "PASSED"
+		}
 	}
-	buildReport.Duration = time.Since(buildReport.Start)
-	// TODO: decide on build status
-	buildReport.Status = "Completed"
-	// send build report stats
-	gStats.SendReport(buildReport)
-	// print duration
-	fmt.Printf("Build duration: %s\n", buildReport.Duration)
 	if err := scanner.Err(); err != nil {
 		log.Error(err)
 	}
+	// output build status
+	fmt.Printf("Build status: %s\n", buildReport.Status)
+	// calculate duration
+	buildReport.Duration = time.Since(buildReport.Start)
+	// print duration
+	fmt.Printf("Build duration: %s\n", buildReport.Duration)
+	// send build report stats
+	gStats.SendReport(buildReport)
 }
 
 // SendPushReport print push details
