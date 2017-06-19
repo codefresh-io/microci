@@ -20,7 +20,7 @@ spec:
     {{- range $host := .Values.ingress.hosts }}
     - http:
         paths:
-          - path: /{{ $servicePath }}/
+          - path: /{{ $servicePath }}/*
             backend:
               serviceName: {{ $serviceName }}
               servicePort: {{ $servicePort }}
