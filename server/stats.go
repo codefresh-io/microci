@@ -31,11 +31,11 @@ func (s *BuildStats) SendReport(report BuildReport) {
 func (s *BuildStats) GetStatsReport() string {
 	var report string
 	for _, r := range s.reports {
-		repJson, err := json.Marshal(r)
+		repJSON, err := json.Marshal(r)
 		if err != nil {
 			break
 		}
-		report += fmt.Sprintln(string(repJson))
+		report += fmt.Sprintln(string(repJSON))
 	}
 	return report
 }

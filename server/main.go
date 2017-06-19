@@ -47,7 +47,8 @@ var (
 	// HumanVersion is a human readable app version
 	HumanVersion = fmt.Sprintf("%s - %.7s (%s) %s", Version, GitCommit, GitBranch, BuildTime)
 
-	AsciiLogo = `
+	// ASCIILogo for MicroCI
+	ASCIILogo = `
                    _ ___ 
   |\/| o  _ ._ _  /   |  
   |  | | (_ | (_) \_ _|_ 
@@ -80,7 +81,7 @@ MicroCI is a minimalistic Continuous Integration (CI) tool designed and tuned fo
    - DOCKER_CERT_PATH   - path to load the TLS certificates from
    - DOCKER_TLS_VERIFY  - enable or disable TLS verification, off by default
    
-Copyright © Codefresh.io`, AsciiLogo)
+Copyright © Codefresh.io`, ASCIILogo)
 	app.Before = before
 	app.Commands = []cli.Command{
 		{
@@ -270,7 +271,7 @@ func reportHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, AsciiLogo)
+	fmt.Fprintf(w, "MicroCI version %s is up and running\n%s", HumanVersion, ASCIILogo)
 	// debug request
 	queryValues := r.URL.Query()
 	if queryValues.Get("debug") == "true" {

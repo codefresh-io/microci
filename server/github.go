@@ -20,8 +20,9 @@ func handlePushEvent(payload interface{}, header webhooks.Header) {
 	// Do whatever you want from here...
 	log.Debugf("%+v", pl)
 
-	// get branch name
-	ref := strings.TrimPrefix(pl.Ref, "refs/heads/")
+	// get branch fro ref (if branch) or tag
+	refs := strings.Split(pl.Ref, "/")
+	ref := refs[len(refs)-1]
 	// get clone URL
 	cloneURL := pl.Repository.CloneURL
 
