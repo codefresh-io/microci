@@ -83,10 +83,10 @@ func (out StdoutNotify) SendPushReport(ctx context.Context, r io.ReadCloser, ima
 		}
 		fmt.Print(line.Stream)
 	}
-
-	// print duration
-	fmt.Printf("Push duration: %s\n", time.Since(start))
 	if err := scanner.Err(); err != nil {
 		log.Error(err)
 	}
+
+	// print duration
+	fmt.Printf("Push duration: %s\n", time.Since(start))
 }
