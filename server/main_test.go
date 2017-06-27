@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	"os"
@@ -53,6 +54,8 @@ func Test_before(t *testing.T) {
 }
 
 func Test_handleSignals(t *testing.T) {
+	_, cancel := context.WithCancel(context.Background())
+	gCancelCommands = append(gCancelCommands, cancel)
 	sigs := make(chan os.Signal, 1)
 	type args struct {
 		sigs         chan os.Signal
