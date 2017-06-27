@@ -187,14 +187,16 @@ func handleSignals(sigs chan os.Signal, exitOnSignal bool) {
 	go func() {
 		sid := <-sigs
 		log.Debugf("Received signal: %d", sid)
-		gStopChan <- true
-		for _, cancelFn := range gCancelCommands {
-			log.Debug("Canceling running command")
-			cancelFn.(context.CancelFunc)()
-		}
-		fmt.Println("\nGracefully exiting :-)")
-		if exitOnSignal {
-			os.Exit(0)
+		if sid == syscall.SIGTERM || sid == syscall.SIGKILL {
+			gStopChan <- true
+			for _, cancelFn := range gCancelCommands {
+				log.Debug("Canceling running command")
+				cancelFn.(context.CancelFunc)()
+			}
+			fmt.Println("\nGracefully exiting :-)")
+			if exitOnSignal {
+				os.Exit(0)
+			}
 		}
 	}()
 }
