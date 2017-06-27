@@ -130,14 +130,12 @@ Copyright © Codefresh.io`, ASCIILogo)
 			ArgsUsage:   "configuration file",
 			Description: "start webhook server to handle webhook events from GitHub",
 			Action:      webhookServer,
-			Before:      beforeCommand,
 		},
 		{
 			Name:        "info",
 			Usage:       "docker info",
 			Description: "show docker info",
 			Action:      dockerInfo,
-			Before:      beforeCommand,
 		},
 	}
 	app.Flags = []cli.Flag{
@@ -199,12 +197,6 @@ func handleSignals(sigs chan os.Signal, exitOnSignal bool) {
 			}
 		}
 	}()
-}
-
-// beforeCommand run before each command
-func beforeCommand(c *cli.Context) error {
-	// get recurrent time interval
-	return nil
 }
 
 // Serve webhooks
