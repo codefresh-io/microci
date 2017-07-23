@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"net/http"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -10,8 +11,43 @@ import (
 	"gopkg.in/go-playground/webhooks.v3/github"
 )
 
+// GitHubHook is a Webhook with additional properties
+type GitHubHook struct {
+	webhook        *github.Webhook
+	Registry       string
+	Repository     string
+	Notify         BuildNotify
+	CancelCommands *[]interface{}
+}
+
+// New creates and returns a GitHubHook instance
+func New(registry, repository string, commands *[]interface{}, notify BuildNotify, config *github.Config) *GitHubHook {
+	return &GitHubHook{
+		webhook:        github.New(config),
+		CancelCommands: commands,
+		Notify:         notify,
+		Registry:       registry,
+		Repository:     repository,
+	}
+}
+
+// RegisterPushEvent register push event
+func (hook GitHubHook) RegisterPushEvent() {
+	hook.webhook.RegisterEvents(hook.handlePushEvent, github.PushEvent)
+}
+
+// ParsePayload parse HTTP payload
+func (hook GitHubHook) ParsePayload(w http.ResponseWriter, r *http.Request) {
+	hook.webhook.ParsePayload(w, r)
+}
+
+// RegisterCreateEvent register push event
+func (hook GitHubHook) RegisterCreateEvent() {
+	hook.webhook.RegisterEvents(hook.handleCreateEvent, github.CreateEvent)
+}
+
 // handlePushEvent handles GitHub push events
-func handlePushEvent(payload interface{}, header webhooks.Header) {
+func (hook GitHubHook) handlePushEvent(payload interface{}, header webhooks.Header) {
 
 	log.Debug("Handling Push Request")
 
@@ -28,12 +64,12 @@ func handlePushEvent(payload interface{}, header webhooks.Header) {
 
 	// do build
 	ctx, cancel := context.WithCancel(context.Background())
-	gCancelCommands = append(gCancelCommands, cancel)
-	go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, pl.HeadCommit.ID, gNotify)
+	*hook.CancelCommands = append(*hook.CancelCommands, cancel)
+	go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, pl.HeadCommit.ID, hook.Registry, hook.Repository, hook.Notify)
 }
 
 // handleCreateEvent handles GitHub create events
-func handleCreateEvent(payload interface{}, header webhooks.Header) {
+func (hook GitHubHook) handleCreateEvent(payload interface{}, header webhooks.Header) {
 
 	log.Debug("Handling Create Request")
 
@@ -48,7 +84,7 @@ func handleCreateEvent(payload interface{}, header webhooks.Header) {
 		cloneURL := pl.Repository.CloneURL
 		// build
 		ctx, cancel := context.WithCancel(context.Background())
-		gCancelCommands = append(gCancelCommands, cancel)
-		go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, ref, gNotify)
+		*hook.CancelCommands = append(*hook.CancelCommands, cancel)
+		go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, ref, hook.Registry, hook.Repository, hook.Notify)
 	}
 }

@@ -22,12 +22,7 @@ const (
 
 var (
 	gClient         DockerClient
-	gSlackToken     string
-	gSlackChannel   string
 	gCancelCommands []interface{}
-	gNotify         BuildNotify
-	gRegistry       string
-	gRepository     string
 )
 
 var (
@@ -200,32 +195,32 @@ func webhookServer(c *cli.Context) {
 	// get port
 	port := c.Int("port")
 	// get slack token and channel
-	gSlackToken = c.String("slack-token")
-	gSlackChannel = c.String("slack-channel")
+	slackToken := c.String("slack-token")
+	slackChannel := c.String("slack-channel")
 	// set global Notify object to Slack or STDOUT
-	if gSlackToken != "" {
-		gNotify = SlackNotify{}
-	} else {
-		gNotify = StdoutNotify{}
+	var notify BuildNotify
+	notify = StdoutNotify{}
+	if slackToken != "" {
+		notify = SlackNotify{slackToken, slackChannel}
 	}
 	// login to registry if credentials are passed
 	user := c.String("user")
 	password := c.String("password")
-	gRegistry = c.String("registry")
-	gRepository = c.String("repository")
+	registry := c.String("registry")
+	repository := c.String("repository")
 	if user != "" && password != "" {
 		ctx, cancel := context.WithCancel(context.Background())
 		gCancelCommands = append(gCancelCommands, cancel)
-		gClient.RegistryLogin(ctx, user, password, gRegistry)
+		gClient.RegistryLogin(ctx, user, password, registry)
 	}
 	// print status
 	fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
 	// create new webhook
-	githubHook := github.New(&github.Config{Secret: secret})
+	githubHook := New(registry, repository, &gCancelCommands, notify, &github.Config{Secret: secret})
 	// register push event handler
-	githubHook.RegisterEvents(handlePushEvent, github.PushEvent)
+	githubHook.RegisterPushEvent()
 	// register create event handler
-	githubHook.RegisterEvents(handleCreateEvent, github.CreateEvent)
+	githubHook.RegisterCreateEvent()
 
 	// create HTTP server
 	srv := http.NewServeMux()

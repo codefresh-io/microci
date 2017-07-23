@@ -16,6 +16,8 @@ import (
 
 // SlackNotify Slack notify interface
 type SlackNotify struct {
+	token   string
+	channel string
 }
 
 // SendBuildReport send build output to slack channel
@@ -55,7 +57,7 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 	gStats.SendReport(buildReport)
 
 	// prepare Slack message
-	api := slack.New(gSlackToken)
+	api := slack.New(s.token)
 	params := slack.PostMessageParameters{}
 	params.IconEmoji = ":whale:"
 	params.Markdown = true
@@ -83,7 +85,7 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 	params.Attachments = []slack.Attachment{attachment}
 
 	// post Slack message
-	channelID, timestamp, err := api.PostMessage(gSlackChannel, "", params)
+	channelID, timestamp, err := api.PostMessage(s.channel, "", params)
 	if err != nil {
 		log.Error(err)
 		return
@@ -113,7 +115,7 @@ func (s SlackNotify) SendPushReport(ctx context.Context, r io.ReadCloser, image 
 	}
 
 	// prepare Slack message
-	api := slack.New(gSlackToken)
+	api := slack.New(s.token)
 	params := slack.PostMessageParameters{}
 	params.IconEmoji = ":whale:"
 	params.Markdown = true
@@ -131,7 +133,7 @@ func (s SlackNotify) SendPushReport(ctx context.Context, r io.ReadCloser, image 
 		},
 	}
 	params.Attachments = []slack.Attachment{attachment}
-	channelID, timestamp, err := api.PostMessage(gSlackChannel, "", params)
+	channelID, timestamp, err := api.PostMessage(s.channel, "", params)
 	if err != nil {
 		log.Error(err)
 		return

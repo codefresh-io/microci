@@ -16,7 +16,7 @@ import (
 // DockerClient interface
 type DockerClient interface {
 	RegistryLogin(ctx context.Context, user, password, registry string) error
-	BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag string, notify BuildNotify) error
+	BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag, registry, repository string, notify BuildNotify) error
 	Info(ctx context.Context) (string, error)
 }
 
@@ -67,18 +67,18 @@ func (api *dockerAPI) RegistryLogin(ctx context.Context, user, password, registr
 	return nil
 }
 
-func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag string, notify BuildNotify) error {
+func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag, registry, repository string, notify BuildNotify) error {
 	// set build options
 	var options types.ImageBuildOptions
 	options.RemoteContext = cloneURL + "#" + ref
 	options.ForceRemove = true
 	// create name for image to build
 	var imageName string
-	if gRegistry != "" {
-		imageName += gRegistry + "/"
+	if registry != "" {
+		imageName += registry + "/"
 	}
-	if gRepository != "" {
-		imageName += gRepository + "/" + name
+	if repository != "" {
+		imageName += repository + "/" + name
 	} else {
 		imageName += fullname
 	}
