@@ -3,10 +3,9 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 )
-
-var gStats BuildStats
 
 // BuildReport build details
 type BuildReport struct {
@@ -19,7 +18,6 @@ type BuildReport struct {
 // BuildStats all build reports for current MicroCI instance
 type BuildStats struct {
 	reports []BuildReport
-	channel chan BuildReport
 }
 
 // SendReport send new build report to gStats channel
@@ -38,4 +36,11 @@ func (s *BuildStats) GetStatsReport() string {
 		report += fmt.Sprintln(string(repJSON))
 	}
 	return report
+}
+
+// ReportHandler HTTP handler helper function
+func (s *BuildStats) ReportHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Fprintln(w, "MicroCI Build Reports")
+	fmt.Fprintln(w, "=====================")
+	fmt.Fprintln(w, s.GetStatsReport())
 }

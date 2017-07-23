@@ -197,11 +197,13 @@ func webhookServer(c *cli.Context) {
 	// get slack token and channel
 	slackToken := c.String("slack-token")
 	slackChannel := c.String("slack-channel")
+	// build stats
+	stats := BuildStats{}
 	// set global Notify object to Slack or STDOUT
 	var notify BuildNotify
-	notify = StdoutNotify{}
+	notify = StdoutNotify{stats}
 	if slackToken != "" {
-		notify = SlackNotify{slackToken, slackChannel}
+		notify = SlackNotify{slackToken, slackChannel, stats}
 	}
 	// login to registry if credentials are passed
 	user := c.String("user")
@@ -235,8 +237,8 @@ func webhookServer(c *cli.Context) {
 	})
 
 	// handle stats
-	srv.HandleFunc("/report", reportHandler)
-	srv.HandleFunc("/microci/report", reportHandler)
+	srv.HandleFunc("/report", stats.ReportHandler)
+	srv.HandleFunc("/microci/report", stats.ReportHandler)
 
 	srv.HandleFunc("/", statusHandler)
 	srv.HandleFunc("/microci/", statusHandler)
@@ -245,12 +247,6 @@ func webhookServer(c *cli.Context) {
 	if err != nil {
 		log.Error(err)
 	}
-}
-
-func reportHandler(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintln(w, "MicroCI Build Reports")
-	fmt.Fprintln(w, "=====================")
-	fmt.Fprintln(w, gStats.GetStatsReport())
 }
 
 func statusHandler(w http.ResponseWriter, r *http.Request) {

@@ -18,6 +18,7 @@ import (
 type SlackNotify struct {
 	token   string
 	channel string
+	stats   BuildStats
 }
 
 // SendBuildReport send build output to slack channel
@@ -54,7 +55,7 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 	buildReport.Duration = time.Since(buildReport.Start)
 
 	// send build report stats
-	gStats.SendReport(buildReport)
+	s.stats.SendReport(buildReport)
 
 	// prepare Slack message
 	api := slack.New(s.token)

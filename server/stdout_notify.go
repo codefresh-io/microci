@@ -19,6 +19,7 @@ type Line struct {
 
 // StdoutNotify notify to STDOUT
 type StdoutNotify struct {
+	stats BuildStats
 }
 
 // SendBuildReport stream build output to STDOUT
@@ -60,7 +61,7 @@ func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, ta
 	// print duration
 	fmt.Printf("Build duration: %s\n", buildReport.Duration)
 	// send build report stats
-	gStats.SendReport(buildReport)
+	out.stats.SendReport(buildReport)
 }
 
 // SendPushReport print push details
