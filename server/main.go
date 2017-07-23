@@ -22,7 +22,6 @@ const (
 
 var (
 	gClient         DockerClient
-	gStopChan       chan bool
 	gSlackToken     string
 	gSlackChannel   string
 	gCancelCommands []interface{}
@@ -178,15 +177,10 @@ func handleSignals(sigs chan os.Signal, exitOnSignal bool) {
 	// Graceful shut-down on SIGINT/SIGTERM
 	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
 
-	// channel to notify long running commands to stop and cleanup
-	// long running commands must listen to this channel and react
-	gStopChan = make(chan bool, 1)
-
 	go func() {
 		sid := <-sigs
 		log.Debugf("Received signal: %d", sid)
 		if sid == syscall.SIGTERM || sid == syscall.SIGKILL {
-			gStopChan <- true
 			for _, cancelFn := range gCancelCommands {
 				log.Debug("Canceling running command")
 				cancelFn.(context.CancelFunc)()
