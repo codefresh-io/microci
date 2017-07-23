@@ -125,13 +125,8 @@ func (idx *TruncIndex) Get(s string) (string, error) {
 	return "", ErrNotExist
 }
 
-// Iterate iterates over all stored IDs and passes each of them to the given
-// handler. Take care that the handler method does not call any public
-// method on truncindex as the internal locking is not reentrant/recursive
-// and will result in deadlock.
+// Iterate iterates over all stored IDs, and passes each of them to the given handler.
 func (idx *TruncIndex) Iterate(handler func(id string)) {
-	idx.Lock()
-	defer idx.Unlock()
 	idx.trie.Visit(func(prefix patricia.Prefix, item patricia.Item) error {
 		handler(string(prefix))
 		return nil

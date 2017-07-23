@@ -8,9 +8,8 @@ import (
 	"sync"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/pkg/ioutils"
-	"github.com/opencontainers/go-digest"
-	"github.com/pkg/errors"
 )
 
 // DigestWalkFunc is function called by StoreBackend.Walk
@@ -48,10 +47,10 @@ func newFSStore(root string) (*fs, error) {
 		root: root,
 	}
 	if err := os.MkdirAll(filepath.Join(root, contentDirName, string(digest.Canonical)), 0700); err != nil {
-		return nil, errors.Wrap(err, "failed to create storage backend")
+		return nil, err
 	}
 	if err := os.MkdirAll(filepath.Join(root, metadataDirName, string(digest.Canonical)), 0700); err != nil {
-		return nil, errors.Wrap(err, "failed to create storage backend")
+		return nil, err
 	}
 	return s, nil
 }
@@ -97,7 +96,7 @@ func (s *fs) Get(dgst digest.Digest) ([]byte, error) {
 func (s *fs) get(dgst digest.Digest) ([]byte, error) {
 	content, err := ioutil.ReadFile(s.contentFile(dgst))
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get digest %s", dgst)
+		return nil, err
 	}
 
 	// todo: maybe optional
@@ -119,7 +118,7 @@ func (s *fs) Set(data []byte) (digest.Digest, error) {
 
 	dgst := digest.FromBytes(data)
 	if err := ioutils.AtomicWriteFile(s.contentFile(dgst), data, 0600); err != nil {
-		return "", errors.Wrap(err, "failed to write digest data")
+		return "", err
 	}
 
 	return dgst, nil
@@ -162,11 +161,7 @@ func (s *fs) GetMetadata(dgst digest.Digest, key string) ([]byte, error) {
 	if _, err := s.get(dgst); err != nil {
 		return nil, err
 	}
-	bytes, err := ioutil.ReadFile(filepath.Join(s.metadataDir(dgst), key))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to read metadata")
-	}
-	return bytes, nil
+	return ioutil.ReadFile(filepath.Join(s.metadataDir(dgst), key))
 }
 
 // DeleteMetadata removes the metadata associated with a digest.

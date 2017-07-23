@@ -39,7 +39,6 @@ const (
 	splunkGzipCompressionKey      = "splunk-gzip"
 	splunkGzipCompressionLevelKey = "splunk-gzip-level"
 	envKey                        = "env"
-	envRegexKey                   = "env-regex"
 	labelsKey                     = "labels"
 	tagKey                        = "tag"
 )
@@ -236,10 +235,7 @@ func New(info logger.Info) (logger.Logger, error) {
 		}
 	}
 
-	attrs, err := info.ExtraAttributes(nil)
-	if err != nil {
-		return nil, err
-	}
+	attrs := info.ExtraAttributes(nil)
 
 	var (
 		postMessagesFrequency = getAdvancedOptionDuration(envVarPostMessagesFrequency, defaultPostMessagesFrequency)
@@ -340,7 +336,7 @@ func (l *splunkLoggerInline) Log(msg *logger.Message) error {
 	event.Source = msg.Source
 
 	message.Event = &event
-	logger.PutMessage(msg)
+
 	return l.queueMessageAsync(message)
 }
 
@@ -358,7 +354,7 @@ func (l *splunkLoggerJSON) Log(msg *logger.Message) error {
 	event.Source = msg.Source
 
 	message.Event = &event
-	logger.PutMessage(msg)
+
 	return l.queueMessageAsync(message)
 }
 
@@ -366,7 +362,7 @@ func (l *splunkLoggerRaw) Log(msg *logger.Message) error {
 	message := l.createSplunkMessage(msg)
 
 	message.Event = string(append(l.prefix, msg.Line...))
-	logger.PutMessage(msg)
+
 	return l.queueMessageAsync(message)
 }
 
@@ -542,7 +538,6 @@ func ValidateLogOpt(cfg map[string]string) error {
 		case splunkGzipCompressionKey:
 		case splunkGzipCompressionLevelKey:
 		case envKey:
-		case envRegexKey:
 		case labelsKey:
 		case tagKey:
 		default:

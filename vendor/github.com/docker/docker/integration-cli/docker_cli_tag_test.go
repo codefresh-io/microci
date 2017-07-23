@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/docker/docker/integration-cli/checker"
-	"github.com/docker/docker/integration-cli/cli/build"
 	"github.com/docker/docker/pkg/stringid"
 	"github.com/docker/docker/pkg/stringutils"
 	"github.com/go-check/check"
@@ -143,9 +142,13 @@ func (s *DockerSuite) TestTagInvalidRepoName(c *check.C) {
 
 // ensure tags cannot create ambiguity with image ids
 func (s *DockerSuite) TestTagTruncationAmbiguity(c *check.C) {
-	buildImageSuccessfully(c, "notbusybox:latest", build.WithDockerfile(`FROM busybox
-		MAINTAINER dockerio`))
-	imageID := getIDByName(c, "notbusybox:latest")
+	imageID, err := buildImage("notbusybox:latest",
+		`FROM busybox
+		MAINTAINER dockerio`,
+		true)
+	if err != nil {
+		c.Fatal(err)
+	}
 	truncatedImageID := stringid.TruncateID(imageID)
 	truncatedTag := fmt.Sprintf("notbusybox:%s", truncatedImageID)
 
@@ -156,7 +159,7 @@ func (s *DockerSuite) TestTagTruncationAmbiguity(c *check.C) {
 	c.Logf("Built image: %s", imageID)
 
 	// test setting tag fails
-	_, _, err := dockerCmdWithError("tag", "busybox:latest", truncatedTag)
+	_, _, err = dockerCmdWithError("tag", "busybox:latest", truncatedTag)
 	if err != nil {
 		c.Fatalf("Error tagging with an image id: %s", err)
 	}

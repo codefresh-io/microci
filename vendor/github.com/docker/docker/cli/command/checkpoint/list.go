@@ -1,12 +1,14 @@
 package checkpoint
 
 import (
+	"fmt"
+	"text/tabwriter"
+
 	"golang.org/x/net/context"
 
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
-	"github.com/docker/docker/cli/command/formatter"
 	"github.com/spf13/cobra"
 )
 
@@ -46,9 +48,15 @@ func runList(dockerCli *command.DockerCli, container string, opts listOptions) e
 		return err
 	}
 
-	cpCtx := formatter.Context{
-		Output: dockerCli.Out(),
-		Format: formatter.NewCheckpointFormat(formatter.TableFormatKey),
+	w := tabwriter.NewWriter(dockerCli.Out(), 20, 1, 3, ' ', 0)
+	fmt.Fprintf(w, "CHECKPOINT NAME")
+	fmt.Fprintf(w, "\n")
+
+	for _, checkpoint := range checkpoints {
+		fmt.Fprintf(w, "%s\t", checkpoint.Name)
+		fmt.Fprint(w, "\n")
 	}
-	return formatter.CheckpointWrite(cpCtx, checkpoints)
+
+	w.Flush()
+	return nil
 }

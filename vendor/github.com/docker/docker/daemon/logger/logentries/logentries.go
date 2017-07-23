@@ -61,9 +61,7 @@ func (f *logentries) Log(msg *logger.Message) error {
 	for k, v := range f.extra {
 		data[k] = v
 	}
-	ts := msg.Timestamp
-	logger.PutMessage(msg)
-	f.writer.Println(f.tag, ts, data)
+	f.writer.Println(f.tag, msg.Timestamp, data)
 	return nil
 }
 
@@ -80,7 +78,6 @@ func ValidateLogOpt(cfg map[string]string) error {
 	for key := range cfg {
 		switch key {
 		case "env":
-		case "env-regex":
 		case "labels":
 		case "tag":
 		case key:

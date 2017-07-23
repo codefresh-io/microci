@@ -6,13 +6,11 @@ import (
 	"os"
 
 	"github.com/docker/docker/cli/command/bundlefile"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 )
 
 func addComposefileFlag(opt *string, flags *pflag.FlagSet) {
 	flags.StringVarP(opt, "compose-file", "c", "", "Path to a Compose file")
-	flags.SetAnnotation("compose-file", "version", []string{"1.25"})
 }
 
 func addBundlefileFlag(opt *string, flags *pflag.FlagSet) {
@@ -31,7 +29,7 @@ func loadBundlefile(stderr io.Writer, namespace string, path string) (*bundlefil
 		path = defaultPath
 	}
 	if _, err := os.Stat(path); err != nil {
-		return nil, errors.Errorf(
+		return nil, fmt.Errorf(
 			"Bundle %s not found. Specify the path with --file",
 			path)
 	}
@@ -45,7 +43,7 @@ func loadBundlefile(stderr io.Writer, namespace string, path string) (*bundlefil
 
 	bundle, err := bundlefile.LoadFile(reader)
 	if err != nil {
-		return nil, errors.Errorf("Error reading %s: %v\n", path, err)
+		return nil, fmt.Errorf("Error reading %s: %v\n", path, err)
 	}
 	return bundle, err
 }

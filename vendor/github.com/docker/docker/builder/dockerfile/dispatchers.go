@@ -8,6 +8,7 @@ package dockerfile
 // package.
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"runtime"
@@ -23,8 +24,8 @@ import (
 	"github.com/docker/docker/api/types/strslice"
 	"github.com/docker/docker/builder"
 	"github.com/docker/docker/pkg/signal"
+	runconfigopts "github.com/docker/docker/runconfig/opts"
 	"github.com/docker/go-connections/nat"
-	"github.com/pkg/errors"
 )
 
 // ENV foo bar
@@ -169,7 +170,7 @@ func add(b *Builder, args []string, attributes map[string]bool, original string)
 		return err
 	}
 
-	return b.runContextCommand(args, true, true, "ADD", nil)
+	return b.runContextCommand(args, true, true, "ADD")
 }
 
 // COPY foo /path
@@ -181,22 +182,11 @@ func dispatchCopy(b *Builder, args []string, attributes map[string]bool, origina
 		return errAtLeastTwoArguments("COPY")
 	}
 
-	flFrom := b.flags.AddString("from", "")
-
 	if err := b.flags.Parse(); err != nil {
 		return err
 	}
 
-	var im *imageMount
-	if flFrom.IsUsed() {
-		var err error
-		im, err = b.imageContexts.get(flFrom.Value)
-		if err != nil {
-			return err
-		}
-	}
-
-	return b.runContextCommand(args, false, false, "COPY", im)
+	return b.runContextCommand(args, false, false, "COPY")
 }
 
 // FROM imagename
@@ -204,13 +194,7 @@ func dispatchCopy(b *Builder, args []string, attributes map[string]bool, origina
 // This sets the image the dockerfile will build on top of.
 //
 func from(b *Builder, args []string, attributes map[string]bool, original string) error {
-	ctxName := ""
-	if len(args) == 3 && strings.EqualFold(args[1], "as") {
-		ctxName = strings.ToLower(args[2])
-		if ok, _ := regexp.MatchString("^[a-z][a-z0-9-_\\.]*$", ctxName); !ok {
-			return errors.Errorf("invalid name for build stage: %q, name can't start with a number or contain symbols", ctxName)
-		}
-	} else if len(args) != 1 {
+	if len(args) != 1 {
 		return errExactlyOneArgument("FROM")
 	}
 
@@ -218,49 +202,35 @@ func from(b *Builder, args []string, attributes map[string]bool, original string
 		return err
 	}
 
-	substituionArgs := []string{}
-	for key, value := range b.buildArgs.GetAllMeta() {
-		substituionArgs = append(substituionArgs, key+"="+value)
-	}
+	name := args[0]
 
-	name, err := ProcessWord(args[0], substituionArgs, b.directive.EscapeToken)
-	if err != nil {
-		return err
-	}
+	var (
+		image builder.Image
+		err   error
+	)
 
-	var image builder.Image
-
-	b.resetImageCache()
-	if _, err := b.imageContexts.new(ctxName, true); err != nil {
-		return err
-	}
-
-	if im, ok := b.imageContexts.byName[name]; ok {
-		if len(im.ImageID()) > 0 {
-			image = im
+	// Windows cannot support a container with no base image.
+	if name == api.NoBaseImageSpecifier {
+		if runtime.GOOS == "windows" {
+			return errors.New("Windows does not support FROM scratch")
 		}
+		b.image = ""
+		b.noBaseImage = true
 	} else {
-		// Windows cannot support a container with no base image.
-		if name == api.NoBaseImageSpecifier {
-			if runtime.GOOS == "windows" {
-				return errors.New("Windows does not support FROM scratch")
-			}
-			b.image = ""
-			b.noBaseImage = true
-		} else {
-			var err error
-			image, err = pullOrGetImage(b, name)
+		// TODO: don't use `name`, instead resolve it to a digest
+		if !b.options.PullParent {
+			image, err = b.docker.GetImageOnBuild(name)
+			// TODO: shouldn't we error out if error is different from "not found" ?
+		}
+		if image == nil {
+			image, err = b.docker.PullOnBuild(b.clientCtx, name, b.options.AuthConfigs, b.Output)
 			if err != nil {
 				return err
 			}
 		}
 	}
-	if image != nil {
-		b.imageContexts.update(image.ImageID(), image.RunConfig())
-	}
 	b.from = image
 
-	b.buildArgs.ResetAllowed()
 	return b.processImageFrom(image)
 }
 
@@ -328,23 +298,17 @@ func workdir(b *Builder, args []string, attributes map[string]bool, original str
 	}
 	b.runConfig.Image = b.image
 
-	cmd := b.runConfig.Cmd
-	comment := "WORKDIR " + b.runConfig.WorkingDir
-	// reset the command for cache detection
-	b.runConfig.Cmd = strslice.StrSlice(append(getShell(b.runConfig), "#(nop) "+comment))
-	defer func(cmd strslice.StrSlice) { b.runConfig.Cmd = cmd }(cmd)
-
 	if hit, err := b.probeCache(); err != nil {
 		return err
 	} else if hit {
 		return nil
 	}
 
-	container, err := b.docker.ContainerCreate(types.ContainerCreateConfig{
-		Config: b.runConfig,
-		// Set a log config to override any default value set on the daemon
-		HostConfig: &container.HostConfig{LogConfig: defaultLogConfig},
-	})
+	// Actually copy the struct
+	workdirConfig := *b.runConfig
+	workdirConfig.Cmd = strslice.StrSlice(append(getShell(b.runConfig), fmt.Sprintf("#(nop) WORKDIR %s", b.runConfig.WorkingDir)))
+
+	container, err := b.docker.ContainerCreate(types.ContainerCreateConfig{Config: &workdirConfig})
 	if err != nil {
 		return err
 	}
@@ -353,7 +317,7 @@ func workdir(b *Builder, args []string, attributes map[string]bool, original str
 		return err
 	}
 
-	return b.commit(container.ID, cmd, comment)
+	return b.commit(container.ID, b.runConfig.Cmd, "WORKDIR "+b.runConfig.WorkingDir)
 }
 
 // RUN some command yo
@@ -367,7 +331,7 @@ func workdir(b *Builder, args []string, attributes map[string]bool, original str
 // RUN [ "echo", "hi" ] # echo hi
 //
 func run(b *Builder, args []string, attributes map[string]bool, original string) error {
-	if !b.hasFromImage() {
+	if b.image == "" && !b.noBaseImage {
 		return errors.New("Please provide a source image with `from` prior to run")
 	}
 
@@ -397,7 +361,34 @@ func run(b *Builder, args []string, attributes map[string]bool, original string)
 	defer func(cmd strslice.StrSlice) { b.runConfig.Cmd = cmd }(cmd)
 	defer func(env []string) { b.runConfig.Env = env }(env)
 
-	cmdBuildEnv := b.buildArgsWithoutConfigEnv()
+	// derive the net build-time environment for this run. We let config
+	// environment override the build time environment.
+	// This means that we take the b.buildArgs list of env vars and remove
+	// any of those variables that are defined as part of the container. In other
+	// words, anything in b.Config.Env. What's left is the list of build-time env
+	// vars that we need to add to each RUN command - note the list could be empty.
+	//
+	// We don't persist the build time environment with container's config
+	// environment, but just sort and prepend it to the command string at time
+	// of commit.
+	// This helps with tracing back the image's actual environment at the time
+	// of RUN, without leaking it to the final image. It also aids cache
+	// lookup for same image built with same build time environment.
+	cmdBuildEnv := []string{}
+	configEnv := runconfigopts.ConvertKVStringsToMap(b.runConfig.Env)
+	for key, val := range b.options.BuildArgs {
+		if !b.isBuildArgAllowed(key) {
+			// skip build-args that are not in allowed list, meaning they have
+			// not been defined by an "ARG" Dockerfile command yet.
+			// This is an error condition but only if there is no "ARG" in the entire
+			// Dockerfile, so we'll generate any necessary errors after we parsed
+			// the entire file (see 'leftoverArgs' processing in evaluator.go )
+			continue
+		}
+		if _, ok := configEnv[key]; !ok && val != nil {
+			cmdBuildEnv = append(cmdBuildEnv, fmt.Sprintf("%s=%s", key, *val))
+		}
+	}
 
 	// derive the command to use for probeCache() and to commit in this container.
 	// Note that we only do this if there are any build-time env vars.  Also, we
@@ -408,7 +399,9 @@ func run(b *Builder, args []string, attributes map[string]bool, original string)
 	// that starts with "foo=abc" to be considered part of a build-time env var.
 	saveCmd := config.Cmd
 	if len(cmdBuildEnv) > 0 {
-		saveCmd = prependEnvOnCmd(b.buildArgs, cmdBuildEnv, saveCmd)
+		sort.Strings(cmdBuildEnv)
+		tmpEnv := append([]string{fmt.Sprintf("|%d", len(cmdBuildEnv))}, cmdBuildEnv...)
+		saveCmd = strslice.StrSlice(append(tmpEnv, saveCmd...))
 	}
 
 	b.runConfig.Cmd = saveCmd
@@ -442,23 +435,8 @@ func run(b *Builder, args []string, attributes map[string]bool, original string)
 	// have the build-time env vars in it (if any) so that future cache look-ups
 	// properly match it.
 	b.runConfig.Env = env
-
 	b.runConfig.Cmd = saveCmd
 	return b.commit(cID, cmd, "run")
-}
-
-func prependEnvOnCmd(buildArgs *buildArgs, buildArgVars []string, cmd strslice.StrSlice) strslice.StrSlice {
-	var tmpBuildEnv []string
-	for _, env := range buildArgVars {
-		key := strings.SplitN(env, "=", 2)[0]
-		if !buildArgs.IsUnreferencedBuiltin(key) {
-			tmpBuildEnv = append(tmpBuildEnv, env)
-		}
-	}
-
-	sort.Strings(tmpBuildEnv)
-	tmpEnv := append([]string{fmt.Sprintf("|%d", len(tmpBuildEnv))}, tmpBuildEnv...)
-	return strslice.StrSlice(append(tmpEnv, cmd...))
 }
 
 // CMD foo
@@ -493,7 +471,7 @@ func cmd(b *Builder, args []string, attributes map[string]bool, original string)
 }
 
 // parseOptInterval(flag) is the duration of flag.Value, or 0 if
-// empty. An error is reported if the value is given and less than 1 second.
+// empty. An error is reported if the value is given and is not positive.
 func parseOptInterval(f *Flag) (time.Duration, error) {
 	s := f.Value
 	if s == "" {
@@ -503,8 +481,8 @@ func parseOptInterval(f *Flag) (time.Duration, error) {
 	if err != nil {
 		return 0, err
 	}
-	if d < time.Duration(time.Second) {
-		return 0, fmt.Errorf("Interval %#v cannot be less than 1 second", f.name)
+	if d <= 0 {
+		return 0, fmt.Errorf("Interval %#v must be positive", f.name)
 	}
 	return d, nil
 }
@@ -540,7 +518,6 @@ func healthcheck(b *Builder, args []string, attributes map[string]bool, original
 
 		flInterval := b.flags.AddString("interval", "")
 		flTimeout := b.flags.AddString("timeout", "")
-		flStartPeriod := b.flags.AddString("start-period", "")
 		flRetries := b.flags.AddString("retries", "")
 
 		if err := b.flags.Parse(); err != nil {
@@ -574,12 +551,6 @@ func healthcheck(b *Builder, args []string, attributes map[string]bool, original
 			return err
 		}
 		healthcheck.Timeout = timeout
-
-		startPeriod, err := parseOptInterval(flStartPeriod)
-		if err != nil {
-			return err
-		}
-		healthcheck.StartPeriod = startPeriod
 
 		if flRetries.Value != "" {
 			retries, err := strconv.ParseInt(flRetries.Value, 10, 32)
@@ -749,7 +720,7 @@ func stopSignal(b *Builder, args []string, attributes map[string]bool, original 
 // ARG name[=value]
 //
 // Adds the variable foo to the trusted list of variables that can be passed
-// to builder using the --build-arg flag for expansion/substitution or passing to 'run'.
+// to builder using the --build-arg flag for expansion/subsitution or passing to 'run'.
 // Dockerfile author may optionally set a default value of this variable.
 func arg(b *Builder, args []string, attributes map[string]bool, original string) error {
 	if len(args) != 1 {
@@ -781,18 +752,19 @@ func arg(b *Builder, args []string, attributes map[string]bool, original string)
 		name = arg
 		hasDefault = false
 	}
+	// add the arg to allowed list of build-time args from this step on.
+	b.allowedBuildArgs[name] = true
 
-	var value *string
-	if hasDefault {
-		value = &newValue
+	// If there is a default value associated with this arg then add it to the
+	// b.buildArgs if one is not already passed to the builder. The args passed
+	// to builder override the default value of 'arg'. Note that a 'nil' for
+	// a value means that the user specified "--build-arg FOO" and "FOO" wasn't
+	// defined as an env var - and in that case we DO want to use the default
+	// value specified in the ARG cmd.
+	if baValue, ok := b.options.BuildArgs[name]; (!ok || baValue == nil) && hasDefault {
+		b.options.BuildArgs[name] = &newValue
 	}
-	b.buildArgs.AddArg(name, value)
 
-	// Arg before FROM doesn't add a layer
-	if !b.hasFromImage() {
-		b.buildArgs.AddMetaArg(name, value)
-		return nil
-	}
 	return b.commit("", b.runConfig.Cmd, fmt.Sprintf("ARG %s", arg))
 }
 
@@ -842,37 +814,7 @@ func errTooManyArguments(command string) error {
 // shell-form of RUN, ENTRYPOINT and CMD instructions
 func getShell(c *container.Config) []string {
 	if 0 == len(c.Shell) {
-		return append([]string{}, defaultShell[:]...)
+		return defaultShell[:]
 	}
-	return append([]string{}, c.Shell[:]...)
-}
-
-// mountByRef creates an imageMount from a reference. pulling the image if needed.
-func mountByRef(b *Builder, name string) (*imageMount, error) {
-	image, err := pullOrGetImage(b, name)
-	if err != nil {
-		return nil, err
-	}
-	im, err := b.imageContexts.new("", false)
-	if err != nil {
-		return nil, err
-	}
-	im.id = image.ImageID()
-	return im, nil
-}
-
-func pullOrGetImage(b *Builder, name string) (builder.Image, error) {
-	var image builder.Image
-	if !b.options.PullParent {
-		image, _ = b.docker.GetImageOnBuild(name)
-		// TODO: shouldn't we error out if error is different from "not found" ?
-	}
-	if image == nil {
-		var err error
-		image, err = b.docker.PullOnBuild(b.clientCtx, name, b.options.AuthConfigs, b.Output)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return image, nil
+	return c.Shell[:]
 }

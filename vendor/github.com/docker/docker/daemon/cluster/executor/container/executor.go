@@ -5,7 +5,6 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/api/types/network"
 	executorpkg "github.com/docker/docker/daemon/cluster/executor"
 	clustertypes "github.com/docker/docker/daemon/cluster/provider"
@@ -54,7 +53,7 @@ func (e *executor) Describe(ctx context.Context) (*api.NodeDescription, error) {
 	addPlugins("Authorization", info.Plugins.Authorization)
 
 	// add v2 plugins
-	v2Plugins, err := e.backend.PluginManager().List(filters.NewArgs())
+	v2Plugins, err := e.backend.PluginManager().List()
 	if err == nil {
 		for _, plgn := range v2Plugins {
 			for _, typ := range plgn.Config.Interface.Types {
@@ -116,7 +115,6 @@ func (e *executor) Describe(ctx context.Context) (*api.NodeDescription, error) {
 func (e *executor) Configure(ctx context.Context, node *api.Node) error {
 	na := node.Attachment
 	if na == nil {
-		e.backend.ReleaseIngress()
 		return nil
 	}
 
@@ -126,7 +124,6 @@ func (e *executor) Configure(ctx context.Context, node *api.Node) error {
 			Driver: na.Network.IPAM.Driver.Name,
 		},
 		Options:        na.Network.DriverState.Options,
-		Ingress:        true,
 		CheckDuplicate: true,
 	}
 
@@ -139,15 +136,13 @@ func (e *executor) Configure(ctx context.Context, node *api.Node) error {
 		options.IPAM.Config = append(options.IPAM.Config, c)
 	}
 
-	_, err := e.backend.SetupIngress(clustertypes.NetworkCreateRequest{
+	return e.backend.SetupIngress(clustertypes.NetworkCreateRequest{
 		ID: na.Network.ID,
 		NetworkCreateRequest: types.NetworkCreateRequest{
 			Name:          na.Network.Spec.Annotations.Name,
 			NetworkCreate: options,
 		},
 	}, na.Addresses[0])
-
-	return err
 }
 
 // Controller returns a docker container runner.
@@ -156,7 +151,7 @@ func (e *executor) Controller(t *api.Task) (exec.Controller, error) {
 		return newNetworkAttacherController(e.backend, t, e.secrets)
 	}
 
-	ctlr, err := newController(e.backend, t, secrets.Restrict(e.secrets, t))
+	ctlr, err := newController(e.backend, t, e.secrets)
 	if err != nil {
 		return nil, err
 	}

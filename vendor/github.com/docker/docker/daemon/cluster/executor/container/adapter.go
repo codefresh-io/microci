@@ -6,25 +6,24 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"os"
 	"strings"
 	"syscall"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/backend"
 	containertypes "github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/api/types/events"
 	"github.com/docker/docker/daemon/cluster/convert"
 	executorpkg "github.com/docker/docker/daemon/cluster/executor"
+	"github.com/docker/docker/reference"
 	"github.com/docker/libnetwork"
 	"github.com/docker/swarmkit/agent/exec"
 	"github.com/docker/swarmkit/api"
 	"github.com/docker/swarmkit/log"
-	gogotypes "github.com/gogo/protobuf/types"
-	"github.com/opencontainers/go-digest"
+	"github.com/docker/swarmkit/protobuf/ptypes"
 	"golang.org/x/net/context"
 	"golang.org/x/time/rate"
 )
@@ -55,13 +54,13 @@ func (c *containerAdapter) pullImage(ctx context.Context) error {
 	spec := c.container.spec()
 
 	// Skip pulling if the image is referenced by image ID.
-	if _, err := digest.Parse(spec.Image); err == nil {
+	if _, err := digest.ParseDigest(spec.Image); err == nil {
 		return nil
 	}
 
 	// Skip pulling if the image is referenced by digest and already
 	// exists locally.
-	named, err := reference.ParseNormalizedNamed(spec.Image)
+	named, err := reference.ParseNamed(spec.Image)
 	if err == nil {
 		if _, ok := named.(reference.Canonical); ok {
 			_, err := c.backend.LookupImage(spec.Image)
@@ -260,28 +259,7 @@ func (c *containerAdapter) create(ctx context.Context) error {
 	return nil
 }
 
-// checkMounts ensures that the provided mounts won't have any host-specific
-// problems at start up. For example, we disallow bind mounts without an
-// existing path, which slightly different from the container API.
-func (c *containerAdapter) checkMounts() error {
-	spec := c.container.spec()
-	for _, mount := range spec.Mounts {
-		switch mount.Type {
-		case api.MountTypeBind:
-			if _, err := os.Stat(mount.Source); os.IsNotExist(err) {
-				return fmt.Errorf("invalid bind mount source, source path not found: %s", mount.Source)
-			}
-		}
-	}
-
-	return nil
-}
-
 func (c *containerAdapter) start(ctx context.Context) error {
-	if err := c.checkMounts(); err != nil {
-		return err
-	}
-
 	return c.backend.ContainerStart(c.container.name(), nil, "", "")
 }
 
@@ -396,26 +374,28 @@ func (c *containerAdapter) deactivateServiceBinding() error {
 	return c.backend.DeactivateContainerServiceBinding(c.container.name())
 }
 
-func (c *containerAdapter) logs(ctx context.Context, options api.LogSubscriptionOptions) (<-chan *backend.LogMessage, error) {
-	apiOptions := &types.ContainerLogsOptions{
-		Follow: options.Follow,
+func (c *containerAdapter) logs(ctx context.Context, options api.LogSubscriptionOptions) (io.ReadCloser, error) {
+	reader, writer := io.Pipe()
 
-		// TODO(stevvooe): Parse timestamp out of message. This
-		// absolutely needs to be done before going to production with
-		// this, at it is completely redundant.
-		Timestamps: true,
-		Details:    false, // no clue what to do with this, let's just deprecate it.
+	apiOptions := &backend.ContainerLogsConfig{
+		ContainerLogsOptions: types.ContainerLogsOptions{
+			Follow: options.Follow,
+
+			// TODO(stevvooe): Parse timestamp out of message. This
+			// absolutely needs to be done before going to production with
+			// this, at it is completely redundant.
+			Timestamps: true,
+			Details:    false, // no clue what to do with this, let's just deprecate it.
+		},
+		OutStream: writer,
 	}
 
 	if options.Since != nil {
-		since, err := gogotypes.TimestampFromProto(options.Since)
+		since, err := ptypes.Timestamp(options.Since)
 		if err != nil {
 			return nil, err
 		}
-		// print since as this formatted string because the docker container
-		// logs interface expects it like this.
-		// see github.com/docker/docker/api/types/time.ParseTimestamps
-		apiOptions.Since = fmt.Sprintf("%d.%09d", since.Unix(), int64(since.Nanosecond()))
+		apiOptions.Since = since.Format(time.RFC3339Nano)
 	}
 
 	if options.Tail < 0 {
@@ -438,11 +418,14 @@ func (c *containerAdapter) logs(ctx context.Context, options api.LogSubscription
 			}
 		}
 	}
-	msgs, err := c.backend.ContainerLogs(ctx, c.container.name(), apiOptions)
-	if err != nil {
-		return nil, err
-	}
-	return msgs, nil
+
+	chStarted := make(chan struct{})
+	go func() {
+		defer writer.Close()
+		c.backend.ContainerLogs(ctx, c.container.name(), apiOptions, chStarted)
+	}()
+
+	return reader, nil
 }
 
 // todo: typed/wrapped errors

@@ -106,7 +106,7 @@ func (daemon *Daemon) ContainerRename(oldName, newName string) error {
 	}()
 
 	sid = container.NetworkSettings.SandboxID
-	if sid != "" && daemon.netController != nil {
+	if daemon.netController != nil {
 		sb, err = daemon.netController.SandboxByID(sid)
 		if err != nil {
 			return err

@@ -18,7 +18,7 @@ type Store struct {
 }
 
 // NewStore creates a Store.
-func NewStore() *Store {
+func NewStore(libRoot string) *Store {
 	return &Store{
 		plugins:  make(map[string]*v2.Plugin),
 		handlers: make(map[string][]func(string, *plugins.Client)),

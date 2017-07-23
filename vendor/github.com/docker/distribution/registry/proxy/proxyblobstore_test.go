@@ -11,13 +11,13 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/proxy/scheduler"
 	"github.com/docker/distribution/registry/storage"
 	"github.com/docker/distribution/registry/storage/cache/memory"
 	"github.com/docker/distribution/registry/storage/driver/filesystem"
 	"github.com/docker/distribution/registry/storage/driver/inmemory"
-	"github.com/opencontainers/go-digest"
 )
 
 var sbsMu sync.Mutex
@@ -115,7 +115,7 @@ func (te *testEnv) RemoteStats() *map[string]int {
 
 // Populate remote store and record the digests
 func makeTestEnv(t *testing.T, name string) *testEnv {
-	nameRef, err := reference.WithName(name)
+	nameRef, err := reference.ParseNamed(name)
 	if err != nil {
 		t.Fatalf("unable to parse reference: %s", err)
 	}
@@ -370,20 +370,15 @@ func testProxyStoreServe(t *testing.T, te *testEnv, numClients int) {
 	wg.Wait()
 
 	remoteBlobCount := len(te.inRemote)
-	sbsMu.Lock()
 	if (*localStats)["stat"] != remoteBlobCount*numClients && (*localStats)["create"] != te.numUnique {
-		sbsMu.Unlock()
 		t.Fatal("Expected: stat:", remoteBlobCount*numClients, "create:", remoteBlobCount)
 	}
-	sbsMu.Unlock()
 
 	// Wait for any async storage goroutines to finish
 	time.Sleep(3 * time.Second)
 
-	sbsMu.Lock()
 	remoteStatCount := (*remoteStats)["stat"]
 	remoteOpenCount := (*remoteStats)["open"]
-	sbsMu.Unlock()
 
 	// Serveblob - blobs come from local
 	for _, dr := range te.inRemote {
@@ -408,8 +403,6 @@ func testProxyStoreServe(t *testing.T, te *testEnv, numClients int) {
 	remoteStats = te.RemoteStats()
 
 	// Ensure remote unchanged
-	sbsMu.Lock()
-	defer sbsMu.Unlock()
 	if (*remoteStats)["stat"] != remoteStatCount && (*remoteStats)["open"] != remoteOpenCount {
 		t.Fatalf("unexpected remote stats: %#v", remoteStats)
 	}

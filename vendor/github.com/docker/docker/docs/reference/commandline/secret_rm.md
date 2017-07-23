@@ -27,14 +27,8 @@ Options:
       --help   Print usage
 ```
 
-## Description
-
 Removes the specified secrets from the swarm. This command has to be run
 targeting a manager node.
-
-For detailed information about using secrets, refer to [manage sensitive data with Docker secrets](https://docs.docker.com/engine/swarm/secrets/).
-
-## Examples
 
 This example removes a secret:
 
@@ -47,7 +41,7 @@ sapth4csdo5b6wz2p5uimh5xg
 > before removing a secret.
 
 
-## Related commands
+## Related information
 
 * [secret create](secret_create.md)
 * [secret inspect](secret_inspect.md)

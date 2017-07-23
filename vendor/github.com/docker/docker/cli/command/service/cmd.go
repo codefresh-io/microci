@@ -14,7 +14,6 @@ func NewServiceCommand(dockerCli *command.DockerCli) *cobra.Command {
 		Short: "Manage services",
 		Args:  cli.NoArgs,
 		RunE:  dockerCli.ShowHelp,
-		Tags:  map[string]string{"version": "1.24"},
 	}
 	cmd.AddCommand(
 		newCreateCommand(dockerCli),

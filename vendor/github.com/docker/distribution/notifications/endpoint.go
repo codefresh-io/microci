@@ -8,12 +8,11 @@ import (
 // EndpointConfig covers the optional configuration parameters for an active
 // endpoint.
 type EndpointConfig struct {
-	Headers           http.Header
-	Timeout           time.Duration
-	Threshold         int
-	Backoff           time.Duration
-	IgnoredMediaTypes []string
-	Transport         *http.Transport `json:"-"`
+	Headers   http.Header
+	Timeout   time.Duration
+	Threshold int
+	Backoff   time.Duration
+	Transport *http.Transport
 }
 
 // defaults set any zero-valued fields to a reasonable default.
@@ -63,7 +62,6 @@ func NewEndpoint(name, url string, config EndpointConfig) *Endpoint {
 		endpoint.Transport, endpoint.metrics.httpStatusListener())
 	endpoint.Sink = newRetryingSink(endpoint.Sink, endpoint.Threshold, endpoint.Backoff)
 	endpoint.Sink = newEventQueue(endpoint.Sink, endpoint.metrics.eventQueueListener())
-	endpoint.Sink = newIgnoredMediaTypesSink(endpoint.Sink, config.IgnoredMediaTypes)
 
 	register(&endpoint)
 	return &endpoint

@@ -27,22 +27,13 @@ Options:
       --help   Print usage
 ```
 
-## Description
-
 Removes one or more networks by name or identifier. To remove a network,
 you must first disconnect any containers connected to it.
-
-## Examples
-
-### Remove a network
-
 To remove the network named 'my-network':
 
 ```bash
   $ docker network rm my-network
 ```
-
-### Remove multiple networks
 
 To delete multiple networks in a single `docker network rm` command, provide
 multiple network names or ids. The following example deletes a network with id
@@ -57,7 +48,7 @@ If the deletion of one network fails, the command continues to the next on the
 list and tries to delete that. The command reports success or failure for each
 deletion.
 
-## Related commands
+## Related information
 
 * [network disconnect ](network_disconnect.md)
 * [network connect](network_connect.md)

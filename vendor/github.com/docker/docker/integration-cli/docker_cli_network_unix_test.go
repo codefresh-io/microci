@@ -12,7 +12,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"syscall"
 	"time"
 
 	"github.com/docker/docker/api/types"
@@ -50,7 +49,7 @@ type DockerNetworkSuite struct {
 
 func (s *DockerNetworkSuite) SetUpTest(c *check.C) {
 	s.d = daemon.New(c, dockerBinary, dockerdBinary, daemon.Config{
-		Experimental: testEnv.ExperimentalDaemon(),
+		Experimental: experimentalDaemon,
 	})
 }
 
@@ -487,35 +486,9 @@ func (s *DockerSuite) TestDockerInspectMultipleNetwork(c *check.C) {
 	err := json.Unmarshal([]byte(result.Stdout()), &networkResources)
 	c.Assert(err, check.IsNil)
 	c.Assert(networkResources, checker.HasLen, 2)
-}
 
-func (s *DockerSuite) TestDockerInspectMultipleNetworksIncludingNonexistent(c *check.C) {
-	// non-existent network was not at the beginning of the inspect list
-	// This should print an error, return an exitCode 1 and print the host network
-	result := dockerCmdWithResult("network", "inspect", "host", "nonexistent")
-	c.Assert(result, icmd.Matches, icmd.Expected{
-		ExitCode: 1,
-		Err:      "Error: No such network: nonexistent",
-		Out:      "host",
-	})
-
-	networkResources := []types.NetworkResource{}
-	err := json.Unmarshal([]byte(result.Stdout()), &networkResources)
-	c.Assert(err, check.IsNil)
-	c.Assert(networkResources, checker.HasLen, 1)
-
-	// Only one non-existent network to inspect
-	// Should print an error and return an exitCode, nothing else
-	result = dockerCmdWithResult("network", "inspect", "nonexistent")
-	c.Assert(result, icmd.Matches, icmd.Expected{
-		ExitCode: 1,
-		Err:      "Error: No such network: nonexistent",
-		Out:      "[]",
-	})
-
-	// non-existent network was at the beginning of the inspect list
-	// Should not fail fast, and still print host network but print an error
-	result = dockerCmdWithResult("network", "inspect", "nonexistent", "host")
+	// Should print an error, return an exitCode 1 *but* should print the host network
+	result = dockerCmdWithResult("network", "inspect", "host", "nonexistent")
 	c.Assert(result, icmd.Matches, icmd.Expected{
 		ExitCode: 1,
 		Err:      "Error: No such network: nonexistent",
@@ -524,8 +497,15 @@ func (s *DockerSuite) TestDockerInspectMultipleNetworksIncludingNonexistent(c *c
 
 	networkResources = []types.NetworkResource{}
 	err = json.Unmarshal([]byte(result.Stdout()), &networkResources)
-	c.Assert(err, check.IsNil)
 	c.Assert(networkResources, checker.HasLen, 1)
+
+	// Should print an error and return an exitCode, nothing else
+	result = dockerCmdWithResult("network", "inspect", "nonexistent")
+	c.Assert(result, icmd.Matches, icmd.Expected{
+		ExitCode: 1,
+		Err:      "Error: No such network: nonexistent",
+		Out:      "[]",
+	})
 }
 
 func (s *DockerSuite) TestDockerInspectNetworkWithContainerName(c *check.C) {
@@ -823,14 +803,15 @@ func (s *DockerDaemonSuite) TestDockerNetworkNoDiscoveryDefaultBridgeNetwork(c *
 	hostsFile := "/etc/hosts"
 	bridgeName := "external-bridge"
 	bridgeIP := "192.169.255.254/24"
-	createInterface(c, "bridge", bridgeName, bridgeIP)
+	out, err := createInterface(c, "bridge", bridgeName, bridgeIP)
+	c.Assert(err, check.IsNil, check.Commentf(out))
 	defer deleteInterface(c, bridgeName)
 
 	s.d.StartWithBusybox(c, "--bridge", bridgeName)
 	defer s.d.Restart(c)
 
 	// run two containers and store first container's etc/hosts content
-	out, err := s.d.Cmd("run", "-d", "busybox", "top")
+	out, err = s.d.Cmd("run", "-d", "busybox", "top")
 	c.Assert(err, check.IsNil)
 	cid1 := strings.TrimSpace(out)
 	defer s.d.Cmd("stop", cid1)
@@ -888,15 +869,18 @@ func (s *DockerNetworkSuite) TestDockerNetworkAnonymousEndpoint(c *check.C) {
 	out, _ := dockerCmd(c, "run", "-d", "--net", cstmBridgeNw, "busybox", "top")
 	cid1 := strings.TrimSpace(out)
 
-	hosts1 := readContainerFileWithExec(c, cid1, hostsFile)
+	hosts1, err := readContainerFileWithExec(cid1, hostsFile)
+	c.Assert(err, checker.IsNil)
 
 	out, _ = dockerCmd(c, "run", "-d", "--net", cstmBridgeNw, "busybox", "top")
 	cid2 := strings.TrimSpace(out)
 
-	hosts2 := readContainerFileWithExec(c, cid2, hostsFile)
+	hosts2, err := readContainerFileWithExec(cid2, hostsFile)
+	c.Assert(err, checker.IsNil)
 
 	// verify first container etc/hosts file has not changed
-	hosts1post := readContainerFileWithExec(c, cid1, hostsFile)
+	hosts1post, err := readContainerFileWithExec(cid1, hostsFile)
+	c.Assert(err, checker.IsNil)
 	c.Assert(string(hosts1), checker.Equals, string(hosts1post),
 		check.Commentf("Unexpected %s change on anonymous container creation", hostsFile))
 
@@ -907,8 +891,11 @@ func (s *DockerNetworkSuite) TestDockerNetworkAnonymousEndpoint(c *check.C) {
 
 	dockerCmd(c, "network", "connect", cstmBridgeNw1, cid2)
 
-	hosts2 = readContainerFileWithExec(c, cid2, hostsFile)
-	hosts1post = readContainerFileWithExec(c, cid1, hostsFile)
+	hosts2, err = readContainerFileWithExec(cid2, hostsFile)
+	c.Assert(err, checker.IsNil)
+
+	hosts1post, err = readContainerFileWithExec(cid1, hostsFile)
+	c.Assert(err, checker.IsNil)
 	c.Assert(string(hosts1), checker.Equals, string(hosts1post),
 		check.Commentf("Unexpected %s change on container connect", hostsFile))
 
@@ -923,16 +910,18 @@ func (s *DockerNetworkSuite) TestDockerNetworkAnonymousEndpoint(c *check.C) {
 
 	// Stop named container and verify first two containers' etc/hosts file hasn't changed
 	dockerCmd(c, "stop", cid3)
-	hosts1post = readContainerFileWithExec(c, cid1, hostsFile)
+	hosts1post, err = readContainerFileWithExec(cid1, hostsFile)
+	c.Assert(err, checker.IsNil)
 	c.Assert(string(hosts1), checker.Equals, string(hosts1post),
 		check.Commentf("Unexpected %s change on name container creation", hostsFile))
 
-	hosts2post := readContainerFileWithExec(c, cid2, hostsFile)
+	hosts2post, err := readContainerFileWithExec(cid2, hostsFile)
+	c.Assert(err, checker.IsNil)
 	c.Assert(string(hosts2), checker.Equals, string(hosts2post),
 		check.Commentf("Unexpected %s change on name container creation", hostsFile))
 
 	// verify that container 1 and 2 can't ping the named container now
-	_, _, err := dockerCmdWithError("exec", cid1, "ping", "-c", "1", cName)
+	_, _, err = dockerCmdWithError("exec", cid1, "ping", "-c", "1", cName)
 	c.Assert(err, check.NotNil)
 	_, _, err = dockerCmdWithError("exec", cid2, "ping", "-c", "1", cName)
 	c.Assert(err, check.NotNil)
@@ -1424,7 +1413,7 @@ func verifyIPAddresses(c *check.C, cName, nwname, ipv4, ipv6 string) {
 
 func (s *DockerNetworkSuite) TestDockerNetworkConnectLinkLocalIP(c *check.C) {
 	// create one test network
-	dockerCmd(c, "network", "create", "--ipv6", "--subnet=2001:db8:1234::/64", "n0")
+	dockerCmd(c, "network", "create", "n0")
 	assertNwIsAvailable(c, "n0")
 
 	// run a container with incorrect link-local address
@@ -1660,17 +1649,16 @@ func (s *DockerSuite) TestDockerNetworkInternalMode(c *check.C) {
 	c.Assert(err, check.IsNil)
 }
 
-// Test for #21401
+// Test for special characters in network names. only [a-zA-Z0-9][a-zA-Z0-9_.-] are
+// valid characters
 func (s *DockerNetworkSuite) TestDockerNetworkCreateDeleteSpecialCharacters(c *check.C) {
-	dockerCmd(c, "network", "create", "test@#$")
-	assertNwIsAvailable(c, "test@#$")
-	dockerCmd(c, "network", "rm", "test@#$")
-	assertNwNotAvailable(c, "test@#$")
+	_, _, err := dockerCmdWithError("network", "create", "test@#$")
+	c.Assert(err, check.NotNil)
 
-	dockerCmd(c, "network", "create", "kiwl$%^")
-	assertNwIsAvailable(c, "kiwl$%^")
-	dockerCmd(c, "network", "rm", "kiwl$%^")
-	assertNwNotAvailable(c, "kiwl$%^")
+	dockerCmd(c, "network", "create", "test-1_0.net")
+	assertNwIsAvailable(c, "test-1_0.net")
+	dockerCmd(c, "network", "rm", "test-1_0.net")
+	assertNwNotAvailable(c, "test-1_0.net")
 }
 
 func (s *DockerDaemonSuite) TestDaemonRestartRestoreBridgeNetwork(t *check.C) {
@@ -1789,57 +1777,4 @@ func (s *DockerNetworkSuite) TestDockerNetworkDisconnectFromBridge(c *check.C) {
 
 	_, _, err := dockerCmdWithError("network", "disconnect", network, name)
 	c.Assert(err, check.IsNil)
-}
-
-// TestConntrackFlowsLeak covers the failure scenario of ticket: https://github.com/docker/docker/issues/8795
-// Validates that conntrack is correctly cleaned once a container is destroyed
-func (s *DockerNetworkSuite) TestConntrackFlowsLeak(c *check.C) {
-	testRequires(c, IsAmd64, DaemonIsLinux, Network)
-
-	// Create a new network
-	dockerCmd(c, "network", "create", "--subnet=192.168.10.0/24", "--gateway=192.168.10.1", "-o", "com.docker.network.bridge.host_binding_ipv4=192.168.10.1", "testbind")
-	assertNwIsAvailable(c, "testbind")
-
-	// Launch the server, this will remain listening on an exposed port and reply to any request in a ping/pong fashion
-	cmd := "while true; do echo hello | nc -w 1 -lu 8080; done"
-	_, _, err := dockerCmdWithError("run", "-d", "--name", "server", "--net", "testbind", "-p", "8080:8080/udp", "appropriate/nc", "sh", "-c", cmd)
-	c.Assert(err, check.IsNil)
-
-	// Launch a container client, here the objective is to create a flow that is natted in order to expose the bug
-	cmd = "echo world | nc -q 1 -u 192.168.10.1 8080"
-	_, _, err = dockerCmdWithError("run", "-d", "--name", "client", "--net=host", "appropriate/nc", "sh", "-c", cmd)
-	c.Assert(err, check.IsNil)
-
-	// Get all the flows using netlink
-	flows, err := netlink.ConntrackTableList(netlink.ConntrackTable, syscall.AF_INET)
-	c.Assert(err, check.IsNil)
-	var flowMatch int
-	for _, flow := range flows {
-		// count only the flows that we are interested in, skipping others that can be laying around the host
-		if flow.Forward.Protocol == syscall.IPPROTO_UDP &&
-			flow.Forward.DstIP.Equal(net.ParseIP("192.168.10.1")) &&
-			flow.Forward.DstPort == 8080 {
-			flowMatch++
-		}
-	}
-	// The client should have created only 1 flow
-	c.Assert(flowMatch, checker.Equals, 1)
-
-	// Now delete the server, this will trigger the conntrack cleanup
-	err = deleteContainer("server")
-	c.Assert(err, checker.IsNil)
-
-	// Fetch again all the flows and validate that there is no server flow in the conntrack laying around
-	flows, err = netlink.ConntrackTableList(netlink.ConntrackTable, syscall.AF_INET)
-	c.Assert(err, check.IsNil)
-	flowMatch = 0
-	for _, flow := range flows {
-		if flow.Forward.Protocol == syscall.IPPROTO_UDP &&
-			flow.Forward.DstIP.Equal(net.ParseIP("192.168.10.1")) &&
-			flow.Forward.DstPort == 8080 {
-			flowMatch++
-		}
-	}
-	// All the flows have to be gone
-	c.Assert(flowMatch, checker.Equals, 0)
 }

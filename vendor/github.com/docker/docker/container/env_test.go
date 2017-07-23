@@ -4,14 +4,11 @@ import "testing"
 
 func TestReplaceAndAppendEnvVars(t *testing.T) {
 	var (
-		d = []string{"HOME=/", "FOO=foo_default"}
-		// remove FOO from env
-		// remove BAR from env (nop)
-		o = []string{"HOME=/root", "TERM=xterm", "FOO", "BAR"}
+		d = []string{"HOME=/"}
+		o = []string{"HOME=/root", "TERM=xterm"}
 	)
 
 	env := ReplaceOrAppendEnvValues(d, o)
-	t.Logf("default=%v, override=%v, result=%v", d, o, env)
 	if len(env) != 2 {
 		t.Fatalf("expected len of 2 got %d", len(env))
 	}

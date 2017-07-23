@@ -1,10 +1,12 @@
 package container
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
-	"github.com/docker/docker/cli/command/formatter"
-	"github.com/pkg/errors"
+	"github.com/docker/docker/pkg/archive"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
@@ -38,9 +40,19 @@ func runDiff(dockerCli *command.DockerCli, opts *diffOptions) error {
 	if err != nil {
 		return err
 	}
-	diffCtx := formatter.Context{
-		Output: dockerCli.Out(),
-		Format: formatter.NewDiffFormat("{{.Type}} {{.Path}}"),
+
+	for _, change := range changes {
+		var kind string
+		switch change.Kind {
+		case archive.ChangeModify:
+			kind = "C"
+		case archive.ChangeAdd:
+			kind = "A"
+		case archive.ChangeDelete:
+			kind = "D"
+		}
+		fmt.Fprintln(dockerCli.Out(), kind, change.Path)
 	}
-	return formatter.DiffWrite(diffCtx, changes)
+
+	return nil
 }

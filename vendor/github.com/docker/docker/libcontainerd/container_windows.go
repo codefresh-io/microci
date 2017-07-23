@@ -201,17 +201,8 @@ func (ctr *container) waitExit(process *process, isFirstProcessToStart bool) err
 	logrus.Debugln("libcontainerd: waitExit() on pid", process.systemPid)
 
 	exitCode := ctr.waitProcessExitCode(process)
-	// Lock the container while removing the process/container from the list
+	// Lock the container while shutting down
 	ctr.client.lock(ctr.containerID)
-
-	if !isFirstProcessToStart {
-		ctr.cleanProcess(process.friendlyName)
-	} else {
-		ctr.client.deleteContainer(ctr.containerID)
-	}
-
-	// Unlock here so other threads are unblocked
-	ctr.client.unlock(ctr.containerID)
 
 	// Assume the container has exited
 	si := StateInfo{
@@ -227,6 +218,7 @@ func (ctr *container) waitExit(process *process, isFirstProcessToStart bool) err
 	// But it could have been an exec'd process which exited
 	if !isFirstProcessToStart {
 		si.State = StateExitProcess
+		ctr.cleanProcess(process.friendlyName)
 	} else {
 		updatePending, err := ctr.hcsContainer.HasPendingUpdates()
 		if err != nil {
@@ -244,11 +236,19 @@ func (ctr *container) waitExit(process *process, isFirstProcessToStart bool) err
 		if err := ctr.hcsContainer.Close(); err != nil {
 			logrus.Error(err)
 		}
+
+		// Remove process from list if we have exited
+		if si.State == StateExit {
+			ctr.client.deleteContainer(ctr.containerID)
+		}
 	}
 
 	if err := process.hcsProcess.Close(); err != nil {
 		logrus.Errorf("libcontainerd: hcsProcess.Close(): %v", err)
 	}
+
+	// Unlock here before we call back into the daemon to update state
+	ctr.client.unlock(ctr.containerID)
 
 	// Call into the backend to notify it of the state change.
 	logrus.Debugf("libcontainerd: waitExit() calling backend.StateChanged %+v", si)

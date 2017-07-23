@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/integration-cli/checker"
-	"github.com/docker/docker/integration-cli/request"
 	"github.com/go-check/check"
 )
 
@@ -129,7 +128,7 @@ func (s *DockerSuite) TestKillStoppedContainerAPIPre120(c *check.C) {
 	runSleepingContainer(c, "--name", "docker-kill-test-api", "-d")
 	dockerCmd(c, "stop", "docker-kill-test-api")
 
-	status, _, err := request.SockRequest("POST", fmt.Sprintf("/v1.19/containers/%s/kill", "docker-kill-test-api"), nil, daemonHost())
+	status, _, err := sockRequest("POST", fmt.Sprintf("/v1.19/containers/%s/kill", "docker-kill-test-api"), nil)
 	c.Assert(err, check.IsNil)
 	c.Assert(status, check.Equals, http.StatusNoContent)
 }

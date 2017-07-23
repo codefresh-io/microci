@@ -26,9 +26,3 @@ Options:
       --help                 Print usage
   -i, --interactive          Attach container's STDIN
 ```
-
-## Examples
-
-```bash
-$ docker start my_container
-```

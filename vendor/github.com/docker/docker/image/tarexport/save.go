@@ -10,13 +10,13 @@ import (
 	"time"
 
 	"github.com/docker/distribution"
-	"github.com/docker/distribution/reference"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/image"
 	"github.com/docker/docker/image/v1"
 	"github.com/docker/docker/layer"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/system"
-	"github.com/opencontainers/go-digest"
+	"github.com/docker/docker/reference"
 	"github.com/pkg/errors"
 )
 
@@ -51,12 +51,16 @@ func (l *tarexporter) parseNames(names []string) (map[image.ID]*imageDescriptor,
 		}
 
 		if ref != nil {
+			var tagged reference.NamedTagged
 			if _, ok := ref.(reference.Canonical); ok {
 				return
 			}
-			tagged, ok := reference.TagNameOnly(ref).(reference.NamedTagged)
-			if !ok {
-				return
+			var ok bool
+			if tagged, ok = ref.(reference.NamedTagged); !ok {
+				var err error
+				if tagged, err = reference.WithTag(ref, reference.DefaultTag); err != nil {
+					return
+				}
 			}
 
 			for _, t := range imgDescr[id].refs {
@@ -69,26 +73,19 @@ func (l *tarexporter) parseNames(names []string) (map[image.ID]*imageDescriptor,
 	}
 
 	for _, name := range names {
-		ref, err := reference.ParseAnyReference(name)
+		id, ref, err := reference.ParseIDOrReference(name)
 		if err != nil {
 			return nil, err
 		}
-		namedRef, ok := ref.(reference.Named)
-		if !ok {
-			// Check if digest ID reference
-			if digested, ok := ref.(reference.Digested); ok {
-				id := image.IDFromDigest(digested.Digest())
-				_, err := l.is.Get(id)
-				if err != nil {
-					return nil, err
-				}
-				addAssoc(id, nil)
-				continue
+		if id != "" {
+			_, err := l.is.Get(image.IDFromDigest(id))
+			if err != nil {
+				return nil, err
 			}
-			return nil, errors.Errorf("invalid reference: %v", name)
+			addAssoc(image.IDFromDigest(id), nil)
+			continue
 		}
-
-		if reference.FamiliarName(namedRef) == string(digest.Canonical) {
+		if ref.Name() == string(digest.Canonical) {
 			imgID, err := l.is.Search(name)
 			if err != nil {
 				return nil, err
@@ -96,8 +93,8 @@ func (l *tarexporter) parseNames(names []string) (map[image.ID]*imageDescriptor,
 			addAssoc(imgID, nil)
 			continue
 		}
-		if reference.IsNameOnly(namedRef) {
-			assocs := l.rs.ReferencesByName(namedRef)
+		if reference.IsNameOnly(ref) {
+			assocs := l.rs.ReferencesByName(ref)
 			for _, assoc := range assocs {
 				addAssoc(image.IDFromDigest(assoc.ID), assoc.Ref)
 			}
@@ -110,11 +107,11 @@ func (l *tarexporter) parseNames(names []string) (map[image.ID]*imageDescriptor,
 			}
 			continue
 		}
-		id, err := l.rs.Get(namedRef)
+		id, err = l.rs.Get(ref)
 		if err != nil {
 			return nil, err
 		}
-		addAssoc(image.IDFromDigest(id), namedRef)
+		addAssoc(image.IDFromDigest(id), ref)
 
 	}
 	return imgDescr, nil
@@ -147,12 +144,11 @@ func (s *saveSession) save(outStream io.Writer) error {
 		var layers []string
 
 		for _, ref := range imageDescr.refs {
-			familiarName := reference.FamiliarName(ref)
-			if _, ok := reposLegacy[familiarName]; !ok {
-				reposLegacy[familiarName] = make(map[string]string)
+			if _, ok := reposLegacy[ref.Name()]; !ok {
+				reposLegacy[ref.Name()] = make(map[string]string)
 			}
-			reposLegacy[familiarName][ref.Tag()] = imageDescr.layers[len(imageDescr.layers)-1]
-			repoTags = append(repoTags, reference.FamiliarString(ref))
+			reposLegacy[ref.Name()][ref.Tag()] = imageDescr.layers[len(imageDescr.layers)-1]
+			repoTags = append(repoTags, ref.String())
 		}
 
 		for _, l := range imageDescr.layers {
@@ -238,9 +234,7 @@ func (s *saveSession) saveImage(id image.ID) (map[layer.DiffID]distribution.Desc
 	var foreignSrcs map[layer.DiffID]distribution.Descriptor
 	for i := range img.RootFS.DiffIDs {
 		v1Img := image.V1Image{
-			// This is for backward compatibility used for
-			// pre v1.9 docker.
-			Created: time.Unix(0, 0),
+			Created: img.Created,
 		}
 		if i == len(img.RootFS.DiffIDs)-1 {
 			v1Img = img.V1Image

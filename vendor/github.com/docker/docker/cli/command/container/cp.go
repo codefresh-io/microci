@@ -1,6 +1,8 @@
 package container
 
 import (
+	"errors"
+	"fmt"
 	"io"
 	"os"
 	"path/filepath"
@@ -11,7 +13,6 @@ import (
 	"github.com/docker/docker/cli/command"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/system"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
@@ -226,7 +227,7 @@ func copyToContainer(ctx context.Context, dockerCli *command.DockerCli, srcPath,
 		content = os.Stdin
 		resolvedDstPath = dstInfo.Path
 		if !dstInfo.IsDir {
-			return errors.Errorf("destination \"%s:%s\" must be a directory", dstContainer, dstPath)
+			return fmt.Errorf("destination \"%s:%s\" must be a directory", dstContainer, dstPath)
 		}
 	} else {
 		// Prepare source copy info.

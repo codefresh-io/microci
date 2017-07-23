@@ -75,10 +75,7 @@ func New(info logger.Info) (logger.Logger, error) {
 		"CONTAINER_NAME":    info.Name(),
 		"CONTAINER_TAG":     tag,
 	}
-	extraAttrs, err := info.ExtraAttributes(sanitizeKeyMod)
-	if err != nil {
-		return nil, err
-	}
+	extraAttrs := info.ExtraAttributes(sanitizeKeyMod)
 	for k, v := range extraAttrs {
 		vars[k] = v
 	}
@@ -92,7 +89,6 @@ func validateLogOpt(cfg map[string]string) error {
 		switch key {
 		case "labels":
 		case "env":
-		case "env-regex":
 		case "tag":
 		default:
 			return fmt.Errorf("unknown log opt '%s' for journald log driver", key)
@@ -109,14 +105,10 @@ func (s *journald) Log(msg *logger.Message) error {
 	if msg.Partial {
 		vars["CONTAINER_PARTIAL_MESSAGE"] = "true"
 	}
-
-	line := string(msg.Line)
-	logger.PutMessage(msg)
-
 	if msg.Source == "stderr" {
-		return journal.Send(line, journal.PriErr, vars)
+		return journal.Send(string(msg.Line), journal.PriErr, vars)
 	}
-	return journal.Send(line, journal.PriInfo, vars)
+	return journal.Send(string(msg.Line), journal.PriInfo, vars)
 }
 
 func (s *journald) Name() string {

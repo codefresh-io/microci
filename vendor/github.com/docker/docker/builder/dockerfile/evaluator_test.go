@@ -180,17 +180,9 @@ func executeTestCase(t *testing.T, testCase dispatchTestCase) {
 	}
 
 	config := &container.Config{}
-	options := &types.ImageBuildOptions{
-		BuildArgs: make(map[string]*string),
-	}
+	options := &types.ImageBuildOptions{}
 
-	b := &Builder{
-		runConfig: config,
-		options:   options,
-		Stdout:    ioutil.Discard,
-		context:   context,
-		buildArgs: newBuildArgs(options.BuildArgs),
-	}
+	b := &Builder{runConfig: config, options: options, Stdout: ioutil.Discard, context: context}
 
 	err = b.dispatch(0, len(n.Children), n.Children[0])
 

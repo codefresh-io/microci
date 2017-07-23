@@ -6,7 +6,6 @@ import (
 
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
@@ -15,7 +14,7 @@ type removeOptions struct {
 	names []string
 }
 
-func newSecretRemoveCommand(dockerCli command.Cli) *cobra.Command {
+func newSecretRemoveCommand(dockerCli *command.DockerCli) *cobra.Command {
 	return &cobra.Command{
 		Use:     "rm SECRET [SECRET...]",
 		Aliases: []string{"remove"},
@@ -30,23 +29,28 @@ func newSecretRemoveCommand(dockerCli command.Cli) *cobra.Command {
 	}
 }
 
-func runSecretRemove(dockerCli command.Cli, opts removeOptions) error {
+func runSecretRemove(dockerCli *command.DockerCli, opts removeOptions) error {
 	client := dockerCli.Client()
 	ctx := context.Background()
 
+	ids, err := getCliRequestedSecretIDs(ctx, client, opts.names)
+	if err != nil {
+		return err
+	}
+
 	var errs []string
 
-	for _, name := range opts.names {
-		if err := client.SecretRemove(ctx, name); err != nil {
+	for _, id := range ids {
+		if err := client.SecretRemove(ctx, id); err != nil {
 			errs = append(errs, err.Error())
 			continue
 		}
 
-		fmt.Fprintln(dockerCli.Out(), name)
+		fmt.Fprintln(dockerCli.Out(), id)
 	}
 
 	if len(errs) > 0 {
-		return errors.Errorf("%s", strings.Join(errs, "\n"))
+		return fmt.Errorf("%s", strings.Join(errs, "\n"))
 	}
 
 	return nil

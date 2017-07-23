@@ -3,13 +3,11 @@ package main
 import (
 	"archive/tar"
 	"bytes"
-	"io/ioutil"
 	"net/http"
 	"regexp"
 	"strings"
 
 	"github.com/docker/docker/integration-cli/checker"
-	"github.com/docker/docker/integration-cli/request"
 	"github.com/docker/docker/pkg/testutil"
 	"github.com/go-check/check"
 )
@@ -17,7 +15,7 @@ import (
 func (s *DockerSuite) TestBuildAPIDockerFileRemote(c *check.C) {
 	testRequires(c, NotUserNamespace)
 	var testD string
-	if testEnv.DaemonPlatform() == "windows" {
+	if daemonPlatform == "windows" {
 		testD = `FROM busybox
 COPY * /tmp/
 RUN find / -name ba*
@@ -29,10 +27,11 @@ COPY * /tmp/
 RUN find / -xdev -name ba*
 RUN find /tmp/`
 	}
-	server := fakeStorage(c, map[string]string{"testD": testD})
+	server, err := fakeStorage(map[string]string{"testD": testD})
+	c.Assert(err, checker.IsNil)
 	defer server.Close()
 
-	res, body, err := request.Post("/build?dockerfile=baz&remote="+server.URL()+"/testD", request.JSON)
+	res, body, err := sockRequestRaw("POST", "/build?dockerfile=baz&remote="+server.URL()+"/testD", nil, "application/json")
 	c.Assert(err, checker.IsNil)
 	c.Assert(res.StatusCode, checker.Equals, http.StatusOK)
 
@@ -66,12 +65,14 @@ func (s *DockerSuite) TestBuildAPIRemoteTarballContext(c *check.C) {
 	// failed to close tar archive
 	c.Assert(tw.Close(), checker.IsNil)
 
-	server := fakeBinaryStorage(c, map[string]*bytes.Buffer{
+	server, err := fakeBinaryStorage(map[string]*bytes.Buffer{
 		"testT.tar": buffer,
 	})
+	c.Assert(err, checker.IsNil)
+
 	defer server.Close()
 
-	res, b, err := request.Post("/build?remote="+server.URL()+"/testT.tar", request.ContentType("application/tar"))
+	res, b, err := sockRequestRaw("POST", "/build?remote="+server.URL()+"/testT.tar", nil, "application/tar")
 	c.Assert(err, checker.IsNil)
 	c.Assert(res.StatusCode, checker.Equals, http.StatusOK)
 	b.Close()
@@ -113,13 +114,14 @@ RUN echo 'right'
 	// failed to close tar archive
 	c.Assert(tw.Close(), checker.IsNil)
 
-	server := fakeBinaryStorage(c, map[string]*bytes.Buffer{
+	server, err := fakeBinaryStorage(map[string]*bytes.Buffer{
 		"testT.tar": buffer,
 	})
-	defer server.Close()
+	c.Assert(err, checker.IsNil)
 
+	defer server.Close()
 	url := "/build?dockerfile=custom&remote=" + server.URL() + "/testT.tar"
-	res, body, err := request.Post(url, request.ContentType("application/tar"))
+	res, body, err := sockRequestRaw("POST", url, nil, "application/tar")
 	c.Assert(err, checker.IsNil)
 	c.Assert(res.StatusCode, checker.Equals, http.StatusOK)
 
@@ -132,13 +134,14 @@ RUN echo 'right'
 }
 
 func (s *DockerSuite) TestBuildAPILowerDockerfile(c *check.C) {
-	git := newFakeGit(c, "repo", map[string]string{
+	git, err := newFakeGit("repo", map[string]string{
 		"dockerfile": `FROM busybox
 RUN echo from dockerfile`,
 	}, false)
+	c.Assert(err, checker.IsNil)
 	defer git.Close()
 
-	res, body, err := request.Post("/build?remote="+git.RepoURL, request.JSON)
+	res, body, err := sockRequestRaw("POST", "/build?remote="+git.RepoURL, nil, "application/json")
 	c.Assert(err, checker.IsNil)
 	c.Assert(res.StatusCode, checker.Equals, http.StatusOK)
 
@@ -150,16 +153,17 @@ RUN echo from dockerfile`,
 }
 
 func (s *DockerSuite) TestBuildAPIBuildGitWithF(c *check.C) {
-	git := newFakeGit(c, "repo", map[string]string{
+	git, err := newFakeGit("repo", map[string]string{
 		"baz": `FROM busybox
 RUN echo from baz`,
 		"Dockerfile": `FROM busybox
 RUN echo from Dockerfile`,
 	}, false)
+	c.Assert(err, checker.IsNil)
 	defer git.Close()
 
 	// Make sure it tries to 'dockerfile' query param value
-	res, body, err := request.Post("/build?dockerfile=baz&remote="+git.RepoURL, request.JSON)
+	res, body, err := sockRequestRaw("POST", "/build?dockerfile=baz&remote="+git.RepoURL, nil, "application/json")
 	c.Assert(err, checker.IsNil)
 	c.Assert(res.StatusCode, checker.Equals, http.StatusOK)
 
@@ -172,16 +176,17 @@ RUN echo from Dockerfile`,
 
 func (s *DockerSuite) TestBuildAPIDoubleDockerfile(c *check.C) {
 	testRequires(c, UnixCli) // dockerfile overwrites Dockerfile on Windows
-	git := newFakeGit(c, "repo", map[string]string{
+	git, err := newFakeGit("repo", map[string]string{
 		"Dockerfile": `FROM busybox
 RUN echo from Dockerfile`,
 		"dockerfile": `FROM busybox
 RUN echo from dockerfile`,
 	}, false)
+	c.Assert(err, checker.IsNil)
 	defer git.Close()
 
 	// Make sure it tries to 'dockerfile' query param value
-	res, body, err := request.Post("/build?remote="+git.RepoURL, request.JSON)
+	res, body, err := sockRequestRaw("POST", "/build?remote="+git.RepoURL, nil, "application/json")
 	c.Assert(err, checker.IsNil)
 	c.Assert(res.StatusCode, checker.Equals, http.StatusOK)
 
@@ -228,7 +233,7 @@ func (s *DockerSuite) TestBuildAPIUnnormalizedTarPaths(c *check.C) {
 		// failed to close tar archive
 		c.Assert(tw.Close(), checker.IsNil)
 
-		res, body, err := request.Post("/build", request.RawContent(ioutil.NopCloser(buffer)), request.ContentType("application/x-tar"))
+		res, body, err := sockRequestRaw("POST", "/build", buffer, "application/x-tar")
 		c.Assert(err, checker.IsNil)
 		c.Assert(res.StatusCode, checker.Equals, http.StatusOK)
 

@@ -90,7 +90,7 @@ func (ctr *container) spec() (*specs.Spec, error) {
 	return &spec, nil
 }
 
-func (ctr *container) start(checkpoint string, checkpointDir string, attachStdio StdioCallback) (err error) {
+func (ctr *container) start(checkpoint string, checkpointDir string, attachStdio StdioCallback) error {
 	spec, err := ctr.spec()
 	if err != nil {
 		return nil
@@ -100,14 +100,7 @@ func (ctr *container) start(checkpoint string, checkpointDir string, attachStdio
 	defer cancel()
 	ready := make(chan struct{})
 
-	fifoCtx, cancel := context.WithCancel(context.Background())
-	defer func() {
-		if err != nil {
-			cancel()
-		}
-	}()
-
-	iopipe, err := ctr.openFifos(fifoCtx, spec.Process.Terminal)
+	iopipe, err := ctr.openFifos(spec.Process.Terminal)
 	if err != nil {
 		return err
 	}

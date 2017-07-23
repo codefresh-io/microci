@@ -12,7 +12,6 @@ import (
 const (
 	backoffMultiplier = 2
 	defaultTimeout    = 100 * time.Millisecond
-	maxRestartTimeout = 1 * time.Minute
 )
 
 // ErrRestartCanceled is returned when the restart manager has been
@@ -71,14 +70,10 @@ func (rm *restartManager) ShouldRestart(exitCode uint32, hasBeenManuallyStopped 
 	if executionDuration.Seconds() >= 10 {
 		rm.timeout = 0
 	}
-	switch {
-	case rm.timeout == 0:
+	if rm.timeout == 0 {
 		rm.timeout = defaultTimeout
-	case rm.timeout < maxRestartTimeout:
+	} else {
 		rm.timeout *= backoffMultiplier
-	}
-	if rm.timeout > maxRestartTimeout {
-		rm.timeout = maxRestartTimeout
 	}
 
 	var restart bool

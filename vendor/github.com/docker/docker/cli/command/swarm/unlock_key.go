@@ -3,11 +3,12 @@ package swarm
 import (
 	"fmt"
 
+	"github.com/spf13/cobra"
+
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
 	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
 
@@ -16,7 +17,7 @@ type unlockKeyOptions struct {
 	quiet  bool
 }
 
-func newUnlockKeyCommand(dockerCli command.Cli) *cobra.Command {
+func newUnlockKeyCommand(dockerCli *command.DockerCli) *cobra.Command {
 	opts := unlockKeyOptions{}
 
 	cmd := &cobra.Command{
@@ -35,7 +36,7 @@ func newUnlockKeyCommand(dockerCli command.Cli) *cobra.Command {
 	return cmd
 }
 
-func runUnlockKey(dockerCli command.Cli, opts unlockKeyOptions) error {
+func runUnlockKey(dockerCli *command.DockerCli, opts unlockKeyOptions) error {
 	client := dockerCli.Client()
 	ctx := context.Background()
 
@@ -78,7 +79,7 @@ func runUnlockKey(dockerCli command.Cli, opts unlockKeyOptions) error {
 	return nil
 }
 
-func printUnlockCommand(ctx context.Context, dockerCli command.Cli, unlockKey string) {
+func printUnlockCommand(ctx context.Context, dockerCli *command.DockerCli, unlockKey string) {
 	if len(unlockKey) > 0 {
 		fmt.Fprintf(dockerCli.Out(), "To unlock a swarm manager after it restarts, run the `docker swarm unlock`\ncommand and provide the following key:\n\n    %s\n\nPlease remember to store this key in a password manager, since without it you\nwill not be able to restart the manager.\n", unlockKey)
 	}

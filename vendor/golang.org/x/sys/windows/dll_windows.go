@@ -114,8 +114,6 @@ func (p *Proc) Addr() uintptr {
 	return p.addr
 }
 
-//go:uintptrescapes
-
 // Call executes procedure p with arguments a. It will panic, if more then 15 arguments
 // are supplied.
 //
@@ -237,13 +235,6 @@ func NewLazyDLL(name string) *LazyDLL {
 	return &LazyDLL{Name: name}
 }
 
-// NewLazySystemDLL is like NewLazyDLL, but will only
-// search Windows System directory for the DLL if name is
-// a base name (like "advapi32.dll").
-func NewLazySystemDLL(name string) *LazyDLL {
-	return &LazyDLL{Name: name, System: true}
-}
-
 // A LazyProc implements access to a procedure inside a LazyDLL.
 // It delays the lookup until the Addr method is called.
 type LazyProc struct {
@@ -294,8 +285,6 @@ func (p *LazyProc) Addr() uintptr {
 	p.mustFind()
 	return p.proc.Addr()
 }
-
-//go:uintptrescapes
 
 // Call executes procedure p with arguments a. It will panic, if more then 15 arguments
 // are supplied.

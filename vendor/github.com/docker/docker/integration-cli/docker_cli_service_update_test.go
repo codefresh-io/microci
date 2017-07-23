@@ -91,10 +91,10 @@ func (s *DockerSwarmSuite) TestServiceUpdateSecrets(c *check.C) {
 	d := s.AddDaemon(c, true, true)
 	testName := "test_secret"
 	id := d.CreateSecret(c, swarm.SecretSpec{
-		Annotations: swarm.Annotations{
+		swarm.Annotations{
 			Name: testName,
 		},
-		Data: []byte("TESTINGDATA"),
+		[]byte("TESTINGDATA"),
 	})
 	c.Assert(id, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", id))
 	testTarget := "testing"

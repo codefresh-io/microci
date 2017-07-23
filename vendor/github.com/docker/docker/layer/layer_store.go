@@ -9,11 +9,11 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/docker/distribution"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/docker/daemon/graphdriver"
 	"github.com/docker/docker/pkg/idtools"
 	"github.com/docker/docker/pkg/plugingetter"
 	"github.com/docker/docker/pkg/stringid"
-	"github.com/opencontainers/go-digest"
 	"github.com/vbatts/tar-split/tar/asm"
 	"github.com/vbatts/tar-split/tar/storage"
 )
@@ -34,8 +34,6 @@ type layerStore struct {
 
 	mounts map[string]*mountedLayer
 	mountL sync.Mutex
-
-	useTarSplit bool
 }
 
 // StoreOptions are the options used to create a new Store instance
@@ -76,17 +74,11 @@ func NewStoreFromOptions(options StoreOptions) (Store, error) {
 // metadata store and graph driver. The metadata store will be used to restore
 // the Store.
 func NewStoreFromGraphDriver(store MetadataStore, driver graphdriver.Driver) (Store, error) {
-	caps := graphdriver.Capabilities{}
-	if capDriver, ok := driver.(graphdriver.CapabilityDriver); ok {
-		caps = capDriver.Capabilities()
-	}
-
 	ls := &layerStore{
-		store:       store,
-		driver:      driver,
-		layerMap:    map[ChainID]*roLayer{},
-		mounts:      map[string]*mountedLayer{},
-		useTarSplit: !caps.ReproducesExactDiffs,
+		store:    store,
+		driver:   driver,
+		layerMap: map[ChainID]*roLayer{},
+		mounts:   map[string]*mountedLayer{},
 	}
 
 	ids, mounts, err := store.List()
@@ -212,24 +204,21 @@ func (ls *layerStore) loadMount(mount string) error {
 }
 
 func (ls *layerStore) applyTar(tx MetadataTransaction, ts io.Reader, parent string, layer *roLayer) error {
-	digester := digest.Canonical.Digester()
+	digester := digest.Canonical.New()
 	tr := io.TeeReader(ts, digester.Hash())
 
-	rdr := tr
-	if ls.useTarSplit {
-		tsw, err := tx.TarSplitWriter(true)
-		if err != nil {
-			return err
-		}
-		metaPacker := storage.NewJSONPacker(tsw)
-		defer tsw.Close()
+	tsw, err := tx.TarSplitWriter(true)
+	if err != nil {
+		return err
+	}
+	metaPacker := storage.NewJSONPacker(tsw)
+	defer tsw.Close()
 
-		// we're passing nil here for the file putter, because the ApplyDiff will
-		// handle the extraction of the archive
-		rdr, err = asm.NewInputTarStream(tr, metaPacker, nil)
-		if err != nil {
-			return err
-		}
+	// we're passing nil here for the file putter, because the ApplyDiff will
+	// handle the extraction of the archive
+	rdr, err := asm.NewInputTarStream(tr, metaPacker, nil)
+	if err != nil {
+		return err
 	}
 
 	applySize, err := ls.driver.ApplyDiff(layer.cacheID, parent, rdr)
@@ -649,34 +638,6 @@ func (ls *layerStore) initMount(graphID, parent, mountLabel string, initFunc Mou
 	}
 
 	return initID, nil
-}
-
-func (ls *layerStore) getTarStream(rl *roLayer) (io.ReadCloser, error) {
-	if !ls.useTarSplit {
-		var parentCacheID string
-		if rl.parent != nil {
-			parentCacheID = rl.parent.cacheID
-		}
-
-		return ls.driver.Diff(rl.cacheID, parentCacheID)
-	}
-
-	r, err := ls.store.TarSplitReader(rl.chainID)
-	if err != nil {
-		return nil, err
-	}
-
-	pr, pw := io.Pipe()
-	go func() {
-		err := ls.assembleTarTo(rl.cacheID, r, nil, pw)
-		if err != nil {
-			pw.CloseWithError(err)
-		} else {
-			pw.Close()
-		}
-	}()
-
-	return pr, nil
 }
 
 func (ls *layerStore) assembleTarTo(graphID string, metadata io.ReadCloser, size *int64, w io.Writer) error {

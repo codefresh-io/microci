@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -e
 
 # subshell so that we can export PATH and TZ without breaking other things

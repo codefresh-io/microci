@@ -37,26 +37,22 @@ Wrote bundle to vossibility-stack.dab
 A stack is created using the `docker deploy` command:
 
 ```bash
-$ docker deploy --help
+# docker deploy --help
+
 Usage:  docker deploy [OPTIONS] STACK
 
-Deploy a new stack or update an existing stack
-
-Aliases:
-  deploy, up
+Create and update a stack from a Distributed Application Bundle (DAB)
 
 Options:
-      --bundle-file string    Path to a Distributed Application Bundle file
-  -c, --compose-file string   Path to a Compose file
-      --help                  Print usage
-      --with-registry-auth    Send registry authentication details to Swarm agents
-
+      --file   string        Path to a Distributed Application Bundle file (Default: STACK.dab)
+      --help                 Print usage
+      --with-registry-auth   Send registry authentication details to Swarm agents
 ```
 
 Let's deploy the stack created before:
 
 ```bash
-$ docker deploy --bundle-file vossibility-stack.dab vossibility-stack
+# docker deploy vossibility-stack
 Loading bundle from vossibility-stack.dab
 Creating service vossibility-stack_elasticsearch
 Creating service vossibility-stack_kibana
@@ -94,11 +90,12 @@ Options:
       --help   Print usage
 
 Commands:
-  deploy      Deploy a new stack or update an existing stack
+  config      Print the stack configuration
+  deploy      Create and update a stack
   ls          List stacks
-  ps          List the tasks in the stack
   rm          Remove the stack
   services    List the services in the stack
+  tasks       List the tasks in the stack
 
 Run 'docker stack COMMAND --help' for more information on a command.
 ```
@@ -110,7 +107,7 @@ are persisted as files, the file extension is `.dab` (Docker 1.12RC2 tools use
 `.dsb` for the file extension—this will be updated in the next release client).
 
 A bundle has two top-level fields: `version` and `services`. The version used
-by Docker 1.12 and later tools is `0.1`.
+by Docker 1.12 tools is `0.1`.
 
 `services` in the bundle are the services that comprise the app. They
 correspond to the new `Service` object introduced in the 1.12 Docker Engine API.

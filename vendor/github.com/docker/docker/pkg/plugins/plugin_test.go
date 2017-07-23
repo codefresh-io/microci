@@ -1,7 +1,6 @@
 package plugins
 
 import (
-	"errors"
 	"path/filepath"
 	"runtime"
 	"sync"
@@ -18,12 +17,6 @@ func TestPluginAddHandler(t *testing.T) {
 
 	testActive(t, p)
 	Handle("bananas", func(_ string, _ *Client) {})
-	testActive(t, p)
-}
-
-func TestPluginWaitBadPlugin(t *testing.T) {
-	p := &Plugin{activateWait: sync.NewCond(&sync.Mutex{})}
-	p.activateErr = errors.New("some junk happened")
 	testActive(t, p)
 }
 

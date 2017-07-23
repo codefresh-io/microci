@@ -118,11 +118,6 @@ func (daemon *Daemon) Images(imageFilters filters.Args, all bool, withExtraAttrs
 		if layerID != "" {
 			l, err := daemon.layerStore.Get(layerID)
 			if err != nil {
-				// The layer may have been deleted between the call to `Map()` or
-				// `Heads()` and the call to `Get()`, so we just ignore this error
-				if err == layer.ErrLayerDoesNotExist {
-					continue
-				}
 				return nil, err
 			}
 
@@ -140,7 +135,7 @@ func (daemon *Daemon) Images(imageFilters filters.Args, all bool, withExtraAttrs
 				var found bool
 				var matchErr error
 				for _, pattern := range imageFilters.Get("reference") {
-					found, matchErr = reference.FamiliarMatch(pattern, ref)
+					found, matchErr = reference.Match(pattern, ref)
 					if matchErr != nil {
 						return nil, matchErr
 					}
@@ -150,10 +145,10 @@ func (daemon *Daemon) Images(imageFilters filters.Args, all bool, withExtraAttrs
 				}
 			}
 			if _, ok := ref.(reference.Canonical); ok {
-				newImage.RepoDigests = append(newImage.RepoDigests, reference.FamiliarString(ref))
+				newImage.RepoDigests = append(newImage.RepoDigests, ref.String())
 			}
 			if _, ok := ref.(reference.NamedTagged); ok {
-				newImage.RepoTags = append(newImage.RepoTags, reference.FamiliarString(ref))
+				newImage.RepoTags = append(newImage.RepoTags, ref.String())
 			}
 		}
 		if newImage.RepoDigests == nil && newImage.RepoTags == nil {
@@ -176,7 +171,7 @@ func (daemon *Daemon) Images(imageFilters filters.Args, all bool, withExtraAttrs
 		}
 
 		if withExtraAttrs {
-			// lazily init variables
+			// lazyly init variables
 			if imagesMap == nil {
 				allContainers = daemon.List()
 				allLayers = daemon.layerStore.Map()
@@ -210,11 +205,12 @@ func (daemon *Daemon) Images(imageFilters filters.Args, all bool, withExtraAttrs
 	}
 
 	if withExtraAttrs {
-		// Get Shared sizes
+		// Get Shared and Unique sizes
 		for img, newImage := range imagesMap {
 			rootFS := *img.RootFS
 			rootFS.DiffIDs = nil
 
+			newImage.Size = 0
 			newImage.SharedSize = 0
 			for _, id := range img.RootFS.DiffIDs {
 				rootFS.Append(id)
@@ -227,6 +223,8 @@ func (daemon *Daemon) Images(imageFilters filters.Args, all bool, withExtraAttrs
 
 				if layerRefs[chid] > 1 {
 					newImage.SharedSize += diffSize
+				} else {
+					newImage.Size += diffSize
 				}
 			}
 		}
@@ -320,13 +318,13 @@ func (daemon *Daemon) SquashImage(id, parent string) (string, error) {
 	return string(newImgID), nil
 }
 
-func newImage(image *image.Image, size int64) *types.ImageSummary {
+func newImage(image *image.Image, virtualSize int64) *types.ImageSummary {
 	newImage := new(types.ImageSummary)
 	newImage.ParentID = image.Parent.String()
 	newImage.ID = image.ID().String()
 	newImage.Created = image.Created.Unix()
-	newImage.Size = size
-	newImage.VirtualSize = size
+	newImage.Size = -1
+	newImage.VirtualSize = virtualSize
 	newImage.SharedSize = -1
 	newImage.Containers = -1
 	if image.Config != nil {

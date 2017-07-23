@@ -1,4 +1,4 @@
-#!/usr/bin/env bash
+#!/bin/bash
 set -e
 
 BINARY_NAME="$BINARY_SHORT_NAME-$VERSION"

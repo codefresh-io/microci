@@ -1,13 +1,14 @@
 package swarm
 
 import (
+	"errors"
 	"fmt"
+
+	"github.com/spf13/cobra"
 
 	"github.com/docker/docker/api/types/swarm"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
-	"github.com/pkg/errors"
-	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
 
@@ -17,7 +18,7 @@ type joinTokenOptions struct {
 	quiet  bool
 }
 
-func newJoinTokenCommand(dockerCli command.Cli) *cobra.Command {
+func newJoinTokenCommand(dockerCli *command.DockerCli) *cobra.Command {
 	opts := joinTokenOptions{}
 
 	cmd := &cobra.Command{
@@ -37,7 +38,7 @@ func newJoinTokenCommand(dockerCli command.Cli) *cobra.Command {
 	return cmd
 }
 
-func runJoinToken(dockerCli command.Cli, opts joinTokenOptions) error {
+func runJoinToken(dockerCli *command.DockerCli, opts joinTokenOptions) error {
 	worker := opts.role == "worker"
 	manager := opts.role == "manager"
 
@@ -93,7 +94,7 @@ func runJoinToken(dockerCli command.Cli, opts joinTokenOptions) error {
 	return printJoinCommand(ctx, dockerCli, info.Swarm.NodeID, worker, manager)
 }
 
-func printJoinCommand(ctx context.Context, dockerCli command.Cli, nodeID string, worker bool, manager bool) error {
+func printJoinCommand(ctx context.Context, dockerCli *command.DockerCli, nodeID string, worker bool, manager bool) error {
 	client := dockerCli.Client()
 
 	node, _, err := client.NodeInspectWithRaw(ctx, nodeID)

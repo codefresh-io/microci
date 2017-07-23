@@ -6,7 +6,6 @@ import (
 
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 	"golang.org/x/net/context"
 )
@@ -42,7 +41,7 @@ func runRemove(dockerCli *command.DockerCli, sids []string) error {
 		fmt.Fprintf(dockerCli.Out(), "%s\n", sid)
 	}
 	if len(errs) > 0 {
-		return errors.Errorf(strings.Join(errs, "\n"))
+		return fmt.Errorf(strings.Join(errs, "\n"))
 	}
 	return nil
 }

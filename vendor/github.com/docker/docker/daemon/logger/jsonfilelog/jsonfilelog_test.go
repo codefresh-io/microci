@@ -160,13 +160,13 @@ func TestJSONFileLoggerWithLabelsEnv(t *testing.T) {
 	}
 	defer os.RemoveAll(tmp)
 	filename := filepath.Join(tmp, "container.log")
-	config := map[string]string{"labels": "rack,dc", "env": "environ,debug,ssl", "env-regex": "^dc"}
+	config := map[string]string{"labels": "rack,dc", "env": "environ,debug,ssl"}
 	l, err := New(logger.Info{
 		ContainerID:     cid,
 		LogPath:         filename,
 		Config:          config,
 		ContainerLabels: map[string]string{"rack": "101", "dc": "lhr"},
-		ContainerEnv:    []string{"environ=production", "debug=false", "port=10001", "ssl=true", "dc_region=west"},
+		ContainerEnv:    []string{"environ=production", "debug=false", "port=10001", "ssl=true"},
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -189,12 +189,11 @@ func TestJSONFileLoggerWithLabelsEnv(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := map[string]string{
-		"rack":      "101",
-		"dc":        "lhr",
-		"environ":   "production",
-		"debug":     "false",
-		"ssl":       "true",
-		"dc_region": "west",
+		"rack":    "101",
+		"dc":      "lhr",
+		"environ": "production",
+		"debug":   "false",
+		"ssl":     "true",
 	}
 	if !reflect.DeepEqual(extra, expected) {
 		t.Fatalf("Wrong log attrs: %q, expected %q", extra, expected)

@@ -101,7 +101,7 @@ func overlay2Supported() bool {
 		return false
 	}
 
-	daemonV, err := kernel.ParseRelease(testEnv.DaemonKernelVersion())
+	daemonV, err := kernel.ParseRelease(daemonKernelVersion)
 	if err != nil {
 		return false
 	}

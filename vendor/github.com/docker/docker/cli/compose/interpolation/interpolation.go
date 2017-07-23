@@ -1,24 +1,22 @@
 package interpolation
 
 import (
+	"fmt"
+
 	"github.com/docker/docker/cli/compose/template"
-	"github.com/pkg/errors"
+	"github.com/docker/docker/cli/compose/types"
 )
 
 // Interpolate replaces variables in a string with the values from a mapping
-func Interpolate(config map[string]interface{}, section string, mapping template.Mapping) (map[string]interface{}, error) {
-	out := map[string]interface{}{}
+func Interpolate(config types.Dict, section string, mapping template.Mapping) (types.Dict, error) {
+	out := types.Dict{}
 
 	for name, item := range config {
 		if item == nil {
 			out[name] = nil
 			continue
 		}
-		mapItem, ok := item.(map[string]interface{})
-		if !ok {
-			return nil, errors.Errorf("Invalid type for %s : %T instead of %T", name, item, out)
-		}
-		interpolatedItem, err := interpolateSectionItem(name, mapItem, section, mapping)
+		interpolatedItem, err := interpolateSectionItem(name, item.(types.Dict), section, mapping)
 		if err != nil {
 			return nil, err
 		}
@@ -30,18 +28,18 @@ func Interpolate(config map[string]interface{}, section string, mapping template
 
 func interpolateSectionItem(
 	name string,
-	item map[string]interface{},
+	item types.Dict,
 	section string,
 	mapping template.Mapping,
-) (map[string]interface{}, error) {
+) (types.Dict, error) {
 
-	out := map[string]interface{}{}
+	out := types.Dict{}
 
 	for key, value := range item {
 		interpolatedValue, err := recursiveInterpolate(value, mapping)
 		if err != nil {
-			return nil, errors.Errorf(
-				"Invalid interpolation format for %#v option in %s %#v: %#v. You may need to escape any $ with another $.",
+			return nil, fmt.Errorf(
+				"Invalid interpolation format for %#v option in %s %#v: %#v",
 				key, section, name, err.Template,
 			)
 		}
@@ -62,8 +60,8 @@ func recursiveInterpolate(
 	case string:
 		return template.Substitute(value, mapping)
 
-	case map[string]interface{}:
-		out := map[string]interface{}{}
+	case types.Dict:
+		out := types.Dict{}
 		for key, elem := range value {
 			interpolatedElem, err := recursiveInterpolate(elem, mapping)
 			if err != nil {

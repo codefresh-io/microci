@@ -1,9 +1,6 @@
 package node
 
 import (
-	"errors"
-
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
 	apiclient "github.com/docker/docker/client"
@@ -18,7 +15,6 @@ func NewNodeCommand(dockerCli *command.DockerCli) *cobra.Command {
 		Short: "Manage Swarm nodes",
 		Args:  cli.NoArgs,
 		RunE:  dockerCli.ShowHelp,
-		Tags:  map[string]string{"version": "1.24"},
 	}
 	cmd.AddCommand(
 		newDemoteCommand(dockerCli),
@@ -40,16 +36,6 @@ func Reference(ctx context.Context, client apiclient.APIClient, ref string) (str
 		info, err := client.Info(ctx)
 		if err != nil {
 			return "", err
-		}
-		if info.Swarm.NodeID == "" {
-			// If there's no node ID in /info, the node probably
-			// isn't a manager. Call a swarm-specific endpoint to
-			// get a more specific error message.
-			_, err = client.NodeList(ctx, types.NodeListOptions{})
-			if err != nil {
-				return "", err
-			}
-			return "", errors.New("node ID not found in /info")
 		}
 		return info.Swarm.NodeID, nil
 	}

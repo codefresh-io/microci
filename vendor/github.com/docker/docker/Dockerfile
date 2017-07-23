@@ -30,8 +30,8 @@ ARG APT_MIRROR=deb.debian.org
 RUN sed -ri "s/(httpredir|deb).debian.org/$APT_MIRROR/g" /etc/apt/sources.list
 
 # Add zfs ppa
-COPY keys/launchpad-ppa-zfs.asc /go/src/github.com/docker/docker/keys/
-RUN apt-key add /go/src/github.com/docker/docker/keys/launchpad-ppa-zfs.asc
+RUN apt-key adv --keyserver hkp://p80.pool.sks-keyservers.net:80 --recv-keys E871F18B51E0147C77796AC81196BA81F6B0FC61 \
+	|| apt-key adv --keyserver hkp://pgp.mit.edu:80 --recv-keys E871F18B51E0147C77796AC81196BA81F6B0FC61
 RUN echo deb http://ppa.launchpad.net/zfs-native/stable/ubuntu trusty main > /etc/apt/sources.list.d/zfs.list
 
 # Packaged dependencies
@@ -61,6 +61,7 @@ RUN apt-get update && apt-get install -y \
 	libnl-3-dev \
 	libprotobuf-c0-dev \
 	libprotobuf-dev \
+	libsqlite3-dev \
 	libsystemd-journal-dev \
 	libtool \
 	libzfs-dev \
@@ -108,8 +109,8 @@ RUN set -x \
 	&& UNATTENDED=yes OSX_VERSION_MIN=10.6 ${OSXCROSS_PATH}/build.sh
 ENV PATH /osxcross/target/bin:$PATH
 
-# Install seccomp: the version shipped upstream is too old
-ENV SECCOMP_VERSION 2.3.2
+# Install seccomp: the version shipped in trusty is too old
+ENV SECCOMP_VERSION 2.3.1
 RUN set -x \
 	&& export SECCOMP_PATH="$(mktemp -d)" \
 	&& curl -fsSL "https://github.com/seccomp/libseccomp/releases/download/v${SECCOMP_VERSION}/libseccomp-${SECCOMP_VERSION}.tar.gz" \
@@ -127,7 +128,7 @@ RUN set -x \
 # IMPORTANT: If the version of Go is updated, the Windows to Linux CI machines
 #            will need updating, to avoid errors. Ping #docker-maintainers on IRC
 #            with a heads-up.
-ENV GO_VERSION 1.7.5
+ENV GO_VERSION 1.7.4
 RUN curl -fsSL "https://golang.org/dl/go${GO_VERSION}.linux-amd64.tar.gz" \
 	| tar -xzC /usr/local
 
@@ -154,10 +155,8 @@ RUN git clone https://github.com/golang/lint.git /go/src/github.com/golang/lint 
 	&& go install -v github.com/golang/lint/golint
 
 # Install CRIU for checkpoint/restore support
-ENV CRIU_VERSION 2.12.1
-# Install dependancy packages specific to criu
-RUN apt-get install libnet-dev -y && \
-	mkdir -p /usr/src/criu \
+ENV CRIU_VERSION 2.9
+RUN mkdir -p /usr/src/criu \
 	&& curl -sSL https://github.com/xemul/criu/archive/v${CRIU_VERSION}.tar.gz | tar -v -C /usr/src/criu/ -xz --strip-components=1 \
 	&& cd /usr/src/criu \
 	&& make \
@@ -193,15 +192,10 @@ RUN set -x \
 	&& rm -rf "$GOPATH"
 
 # Get the "docker-py" source so we can run their integration tests
-ENV DOCKER_PY_COMMIT 4a08d04aef0595322e1b5ac7c52f28a931da85a5
-# To run integration tests docker-pycreds is required.
-# Before running the integration tests conftest.py is
-# loaded which results in loads auth.py that
-# imports the docker-pycreds module.
+ENV DOCKER_PY_COMMIT e2655f658408f9ad1f62abdef3eb6ed43c0cf324
 RUN git clone https://github.com/docker/docker-py.git /docker-py \
 	&& cd /docker-py \
 	&& git checkout -q $DOCKER_PY_COMMIT \
-	&& pip install docker-pycreds==0.2.1 \
 	&& pip install -r test-requirements.txt
 
 # Install yamllint for validating swagger.yaml

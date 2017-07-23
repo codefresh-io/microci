@@ -3,22 +3,22 @@ package volume
 import (
 	"fmt"
 
+	"golang.org/x/net/context"
+
+	"github.com/docker/docker/api/types/filters"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
-	"github.com/docker/docker/opts"
 	units "github.com/docker/go-units"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/context"
 )
 
 type pruneOptions struct {
-	force  bool
-	filter opts.FilterOpt
+	force bool
 }
 
 // NewPruneCommand returns a new cobra prune command for volumes
-func NewPruneCommand(dockerCli command.Cli) *cobra.Command {
-	opts := pruneOptions{filter: opts.NewFilterOpt()}
+func NewPruneCommand(dockerCli *command.DockerCli) *cobra.Command {
+	var opts pruneOptions
 
 	cmd := &cobra.Command{
 		Use:   "prune [OPTIONS]",
@@ -40,7 +40,6 @@ func NewPruneCommand(dockerCli command.Cli) *cobra.Command {
 
 	flags := cmd.Flags()
 	flags.BoolVarP(&opts.force, "force", "f", false, "Do not prompt for confirmation")
-	flags.Var(&opts.filter, "filter", "Provide filter values (e.g. 'label=<label>')")
 
 	return cmd
 }
@@ -48,14 +47,12 @@ func NewPruneCommand(dockerCli command.Cli) *cobra.Command {
 const warning = `WARNING! This will remove all volumes not used by at least one container.
 Are you sure you want to continue?`
 
-func runPrune(dockerCli command.Cli, opts pruneOptions) (spaceReclaimed uint64, output string, err error) {
-	pruneFilters := command.PruneFilters(dockerCli, opts.filter.Value())
-
+func runPrune(dockerCli *command.DockerCli, opts pruneOptions) (spaceReclaimed uint64, output string, err error) {
 	if !opts.force && !command.PromptForConfirmation(dockerCli.In(), dockerCli.Out(), warning) {
 		return
 	}
 
-	report, err := dockerCli.Client().VolumesPrune(context.Background(), pruneFilters)
+	report, err := dockerCli.Client().VolumesPrune(context.Background(), filters.Args{})
 	if err != nil {
 		return
 	}
@@ -73,6 +70,6 @@ func runPrune(dockerCli command.Cli, opts pruneOptions) (spaceReclaimed uint64, 
 
 // RunPrune calls the Volume Prune API
 // This returns the amount of space reclaimed and a detailed output string
-func RunPrune(dockerCli *command.DockerCli, filter opts.FilterOpt) (uint64, string, error) {
-	return runPrune(dockerCli, pruneOptions{force: true, filter: filter})
+func RunPrune(dockerCli *command.DockerCli) (uint64, string, error) {
+	return runPrune(dockerCli, pruneOptions{force: true})
 }

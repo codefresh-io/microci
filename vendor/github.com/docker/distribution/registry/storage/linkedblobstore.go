@@ -8,10 +8,10 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
+	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/storage/driver"
 	"github.com/docker/distribution/uuid"
-	"github.com/opencontainers/go-digest"
 )
 
 // linkPathFunc describes a function that can resolve a link based on the
@@ -137,7 +137,7 @@ func (lbs *linkedBlobStore) Create(ctx context.Context, options ...distribution.
 	}
 
 	if opts.Mount.ShouldMount {
-		desc, err := lbs.mount(ctx, opts.Mount.From, opts.Mount.From.Digest(), opts.Mount.Stat)
+		desc, err := lbs.mount(ctx, opts.Mount.From, opts.Mount.From.Digest())
 		if err == nil {
 			// Mount successful, no need to initiate an upload session
 			return nil, distribution.ErrBlobMounted{From: opts.Mount.From, Descriptor: desc}
@@ -280,21 +280,14 @@ func (lbs *linkedBlobStore) Enumerate(ctx context.Context, ingestor func(digest.
 	return nil
 }
 
-func (lbs *linkedBlobStore) mount(ctx context.Context, sourceRepo reference.Named, dgst digest.Digest, sourceStat *distribution.Descriptor) (distribution.Descriptor, error) {
-	var stat distribution.Descriptor
-	if sourceStat == nil {
-		// look up the blob info from the sourceRepo if not already provided
-		repo, err := lbs.registry.Repository(ctx, sourceRepo)
-		if err != nil {
-			return distribution.Descriptor{}, err
-		}
-		stat, err = repo.Blobs(ctx).Stat(ctx, dgst)
-		if err != nil {
-			return distribution.Descriptor{}, err
-		}
-	} else {
-		// use the provided blob info
-		stat = *sourceStat
+func (lbs *linkedBlobStore) mount(ctx context.Context, sourceRepo reference.Named, dgst digest.Digest) (distribution.Descriptor, error) {
+	repo, err := lbs.registry.Repository(ctx, sourceRepo)
+	if err != nil {
+		return distribution.Descriptor{}, err
+	}
+	stat, err := repo.Blobs(ctx).Stat(ctx, dgst)
+	if err != nil {
+		return distribution.Descriptor{}, err
 	}
 
 	desc := distribution.Descriptor{
@@ -321,7 +314,7 @@ func (lbs *linkedBlobStore) newBlobUpload(ctx context.Context, uuid, path string
 		blobStore:  lbs,
 		id:         uuid,
 		startedAt:  startedAt,
-		digester:   digest.Canonical.Digester(),
+		digester:   digest.Canonical.New(),
 		fileWriter: fw,
 		driver:     lbs.driver,
 		path:       path,

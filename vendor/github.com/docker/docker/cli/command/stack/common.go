@@ -48,13 +48,3 @@ func getStackNetworks(
 		ctx,
 		types.NetworkListOptions{Filters: getStackFilter(namespace)})
 }
-
-func getStackSecrets(
-	ctx context.Context,
-	apiclient client.APIClient,
-	namespace string,
-) ([]swarm.Secret, error) {
-	return apiclient.SecretList(
-		ctx,
-		types.SecretListOptions{Filters: getStackFilter(namespace)})
-}

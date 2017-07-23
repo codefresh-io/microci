@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/docker/docker/cli/compose/types"
 )
 
 var defaults = map[string]string{
@@ -17,25 +19,25 @@ func defaultMapping(name string) (string, bool) {
 }
 
 func TestInterpolate(t *testing.T) {
-	services := map[string]interface{}{
-		"servicea": map[string]interface{}{
+	services := types.Dict{
+		"servicea": types.Dict{
 			"image":   "example:${USER}",
 			"volumes": []interface{}{"$FOO:/target"},
-			"logging": map[string]interface{}{
+			"logging": types.Dict{
 				"driver": "${FOO}",
-				"options": map[string]interface{}{
+				"options": types.Dict{
 					"user": "$USER",
 				},
 			},
 		},
 	}
-	expected := map[string]interface{}{
-		"servicea": map[string]interface{}{
+	expected := types.Dict{
+		"servicea": types.Dict{
 			"image":   "example:jenny",
 			"volumes": []interface{}{"bar:/target"},
-			"logging": map[string]interface{}{
+			"logging": types.Dict{
 				"driver": "bar",
-				"options": map[string]interface{}{
+				"options": types.Dict{
 					"user": "jenny",
 				},
 			},
@@ -47,11 +49,11 @@ func TestInterpolate(t *testing.T) {
 }
 
 func TestInvalidInterpolation(t *testing.T) {
-	services := map[string]interface{}{
-		"servicea": map[string]interface{}{
+	services := types.Dict{
+		"servicea": types.Dict{
 			"image": "${",
 		},
 	}
 	_, err := Interpolate(services, "service", defaultMapping)
-	assert.EqualError(t, err, `Invalid interpolation format for "image" option in service "servicea": "${". You may need to escape any $ with another $.`)
+	assert.EqualError(t, err, `Invalid interpolation format for "image" option in service "servicea": "${"`)
 }

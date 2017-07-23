@@ -1,11 +1,12 @@
 package volume
 
 import (
+	"golang.org/x/net/context"
+
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
 	"github.com/docker/docker/cli/command/inspect"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/context"
 )
 
 type inspectOptions struct {
@@ -13,7 +14,7 @@ type inspectOptions struct {
 	names  []string
 }
 
-func newInspectCommand(dockerCli command.Cli) *cobra.Command {
+func newInspectCommand(dockerCli *command.DockerCli) *cobra.Command {
 	var opts inspectOptions
 
 	cmd := &cobra.Command{
@@ -31,7 +32,7 @@ func newInspectCommand(dockerCli command.Cli) *cobra.Command {
 	return cmd
 }
 
-func runInspect(dockerCli command.Cli, opts inspectOptions) error {
+func runInspect(dockerCli *command.DockerCli, opts inspectOptions) error {
 	client := dockerCli.Client()
 
 	ctx := context.Background()

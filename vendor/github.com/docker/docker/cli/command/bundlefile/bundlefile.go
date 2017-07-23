@@ -2,9 +2,8 @@ package bundlefile
 
 import (
 	"encoding/json"
+	"fmt"
 	"io"
-
-	"github.com/pkg/errors"
 )
 
 // Bundlefile stores the contents of a bundlefile
@@ -40,12 +39,12 @@ func LoadFile(reader io.Reader) (*Bundlefile, error) {
 	if err := decoder.Decode(bundlefile); err != nil {
 		switch jsonErr := err.(type) {
 		case *json.SyntaxError:
-			return nil, errors.Errorf(
+			return nil, fmt.Errorf(
 				"JSON syntax error at byte %v: %s",
 				jsonErr.Offset,
 				jsonErr.Error())
 		case *json.UnmarshalTypeError:
-			return nil, errors.Errorf(
+			return nil, fmt.Errorf(
 				"Unexpected type at byte %v. Expected %s but received %s.",
 				jsonErr.Offset,
 				jsonErr.Type,

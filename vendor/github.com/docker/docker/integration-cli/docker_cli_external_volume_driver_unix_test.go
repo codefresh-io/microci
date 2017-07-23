@@ -51,7 +51,7 @@ type DockerExternalVolumeSuite struct {
 
 func (s *DockerExternalVolumeSuite) SetUpTest(c *check.C) {
 	s.d = daemon.New(c, dockerBinary, dockerdBinary, daemon.Config{
-		Experimental: testEnv.ExperimentalDaemon(),
+		Experimental: experimentalDaemon,
 	})
 	s.ec = &eventCounter{}
 }
@@ -287,11 +287,15 @@ func (s *DockerExternalVolumeSuite) TestVolumeCLICreateOptionConflict(c *check.C
 
 	out, _, err := dockerCmdWithError("volume", "create", "test", "--driver", volumePluginName)
 	c.Assert(err, check.NotNil, check.Commentf("volume create exception name already in use with another driver"))
-	c.Assert(out, checker.Contains, "must be unique")
+	c.Assert(out, checker.Contains, "A volume named test already exists")
 
 	out, _ = dockerCmd(c, "volume", "inspect", "--format={{ .Driver }}", "test")
 	_, _, err = dockerCmdWithError("volume", "create", "test", "--driver", strings.TrimSpace(out))
 	c.Assert(err, check.IsNil)
+
+	// make sure hidden --name option conflicts with positional arg name
+	out, _, err = dockerCmdWithError("volume", "create", "--name", "test2", "test2")
+	c.Assert(err, check.NotNil, check.Commentf("Conflicting options: either specify --name or provide positional arg, not both"))
 }
 
 func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverNamed(c *check.C) {
@@ -408,23 +412,24 @@ func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverLookupNotBlocked(c *
 
 func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverRetryNotImmediatelyExists(c *check.C) {
 	s.d.StartWithBusybox(c)
-	driverName := "test-external-volume-driver-retry"
+
+	specPath := "/etc/docker/plugins/test-external-volume-driver-retry.spec"
+	os.RemoveAll(specPath)
+	defer os.RemoveAll(specPath)
 
 	errchan := make(chan error)
-	started := make(chan struct{})
 	go func() {
-		close(started)
-		if out, err := s.d.Cmd("run", "--rm", "--name", "test-data-retry", "-v", "external-volume-test:/tmp/external-volume-test", "--volume-driver", driverName, "busybox:latest"); err != nil {
+		if out, err := s.d.Cmd("run", "--rm", "--name", "test-data-retry", "-v", "external-volume-test:/tmp/external-volume-test", "--volume-driver", "test-external-volume-driver-retry", "busybox:latest"); err != nil {
 			errchan <- fmt.Errorf("%v:\n%s", err, out)
 		}
 		close(errchan)
 	}()
-
-	<-started
-	// wait for a retry to occur, then create spec to allow plugin to register
-	time.Sleep(2 * time.Second)
-	p := newVolumePlugin(c, driverName)
-	defer p.Close()
+	go func() {
+		// wait for a retry to occur, then create spec to allow plugin to register
+		time.Sleep(2000 * time.Millisecond)
+		// no need to check for an error here since it will get picked up by the timeout later
+		ioutil.WriteFile(specPath, []byte(s.Server.URL), 0644)
+	}()
 
 	select {
 	case err := <-errchan:
@@ -436,11 +441,11 @@ func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverRetryNotImmediatelyE
 	_, err := s.d.Cmd("volume", "rm", "external-volume-test")
 	c.Assert(err, checker.IsNil)
 
-	c.Assert(p.ec.activations, checker.Equals, 1)
-	c.Assert(p.ec.creations, checker.Equals, 1)
-	c.Assert(p.ec.removals, checker.Equals, 1)
-	c.Assert(p.ec.mounts, checker.Equals, 1)
-	c.Assert(p.ec.unmounts, checker.Equals, 1)
+	c.Assert(s.ec.activations, checker.Equals, 1)
+	c.Assert(s.ec.creations, checker.Equals, 1)
+	c.Assert(s.ec.removals, checker.Equals, 1)
+	c.Assert(s.ec.mounts, checker.Equals, 1)
+	c.Assert(s.ec.unmounts, checker.Equals, 1)
 }
 
 func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverBindExternalVolume(c *check.C) {
@@ -498,7 +503,7 @@ func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverWithDaemonRestart(c 
 
 	dockerCmd(c, "run", "--name=test", "-v", "abc1:/foo", "busybox", "true")
 	var mounts []types.MountPoint
-	inspectFieldAndUnmarshall(c, "test", "Mounts", &mounts)
+	inspectFieldAndMarshall(c, "test", "Mounts", &mounts)
 	c.Assert(mounts, checker.HasLen, 1)
 	c.Assert(mounts[0].Driver, checker.Equals, volumePluginName)
 }
@@ -570,7 +575,7 @@ func (s *DockerExternalVolumeSuite) TestExternalVolumeDriverOutOfBandDelete(c *c
 
 	out, err = s.d.Cmd("volume", "create", "-d", "local", "--name", "test")
 	c.Assert(err, checker.NotNil, check.Commentf(out))
-	c.Assert(out, checker.Contains, "must be unique")
+	c.Assert(out, checker.Contains, "volume named test already exists")
 
 	// simulate out of band volume deletion on plugin level
 	delete(p.vols, "test")

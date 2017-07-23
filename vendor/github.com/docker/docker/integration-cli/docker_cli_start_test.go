@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/docker/docker/integration-cli/checker"
-	"github.com/docker/docker/integration-cli/cli"
 	icmd "github.com/docker/docker/pkg/testutil/cmd"
 	"github.com/go-check/check"
 )
@@ -43,15 +42,18 @@ func (s *DockerSuite) TestStartAttachReturnsOnError(c *check.C) {
 // gh#8555: Exit code should be passed through when using start -a
 func (s *DockerSuite) TestStartAttachCorrectExitCode(c *check.C) {
 	testRequires(c, DaemonIsLinux)
-	out := cli.DockerCmd(c, "run", "-d", "busybox", "sh", "-c", "sleep 2; exit 1").Stdout()
+	out, _, _ := dockerCmdWithStdoutStderr(c, "run", "-d", "busybox", "sh", "-c", "sleep 2; exit 1")
 	out = strings.TrimSpace(out)
 
 	// make sure the container has exited before trying the "start -a"
-	cli.DockerCmd(c, "wait", out)
+	dockerCmd(c, "wait", out)
 
-	cli.Docker(cli.Args("start", "-a", out)).Assert(c, icmd.Expected{
-		ExitCode: 1,
-	})
+	startOut, exitCode, err := dockerCmdWithError("start", "-a", out)
+	// start command should fail
+	c.Assert(err, checker.NotNil, check.Commentf("startOut: %s", startOut))
+	// start -a did not respond with proper exit code
+	c.Assert(exitCode, checker.Equals, 1, check.Commentf("startOut: %s", startOut))
+
 }
 
 func (s *DockerSuite) TestStartAttachSilent(c *check.C) {

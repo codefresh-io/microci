@@ -25,7 +25,14 @@ type shellWord struct {
 // ProcessWord will use the 'env' list of environment variables,
 // and replace any env var references in 'word'.
 func ProcessWord(word string, env []string, escapeToken rune) (string, error) {
-	word, _, err := process(word, env, escapeToken)
+	sw := &shellWord{
+		word:        word,
+		envs:        env,
+		pos:         0,
+		escapeToken: escapeToken,
+	}
+	sw.scanner.Init(strings.NewReader(word))
+	word, _, err := sw.process()
 	return word, err
 }
 
@@ -37,11 +44,6 @@ func ProcessWord(word string, env []string, escapeToken rune) (string, error) {
 // Note, each one is trimmed to remove leading and trailing spaces (unless
 // they are quoted", but ProcessWord retains spaces between words.
 func ProcessWords(word string, env []string, escapeToken rune) ([]string, error) {
-	_, words, err := process(word, env, escapeToken)
-	return words, err
-}
-
-func process(word string, env []string, escapeToken rune) (string, []string, error) {
 	sw := &shellWord{
 		word:        word,
 		envs:        env,
@@ -49,7 +51,8 @@ func process(word string, env []string, escapeToken rune) (string, []string, err
 		escapeToken: escapeToken,
 	}
 	sw.scanner.Init(strings.NewReader(word))
-	return sw.process()
+	_, words, err := sw.process()
+	return words, err
 }
 
 func (sw *shellWord) process() (string, []string, error) {

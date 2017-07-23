@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func buildConfigDetails(source map[string]interface{}, env map[string]string) types.ConfigDetails {
+func buildConfigDetails(source types.Dict) types.ConfigDetails {
 	workingDir, err := os.Getwd()
 	if err != nil {
 		panic(err)
@@ -23,21 +23,8 @@ func buildConfigDetails(source map[string]interface{}, env map[string]string) ty
 		ConfigFiles: []types.ConfigFile{
 			{Filename: "filename.yml", Config: source},
 		},
-		Environment: env,
+		Environment: nil,
 	}
-}
-
-func loadYAML(yaml string) (*types.Config, error) {
-	return loadYAMLWithEnv(yaml, nil)
-}
-
-func loadYAMLWithEnv(yaml string, env map[string]string) (*types.Config, error) {
-	dict, err := ParseYAML([]byte(yaml))
-	if err != nil {
-		return nil, err
-	}
-
-	return Load(buildConfigDetails(dict, env))
 }
 
 var sampleYAML = `
@@ -70,39 +57,39 @@ networks:
         - subnet: 172.28.0.0/16
 `
 
-var sampleDict = map[string]interface{}{
+var sampleDict = types.Dict{
 	"version": "3",
-	"services": map[string]interface{}{
-		"foo": map[string]interface{}{
+	"services": types.Dict{
+		"foo": types.Dict{
 			"image":    "busybox",
-			"networks": map[string]interface{}{"with_me": nil},
+			"networks": types.Dict{"with_me": nil},
 		},
-		"bar": map[string]interface{}{
+		"bar": types.Dict{
 			"image":       "busybox",
 			"environment": []interface{}{"FOO=1"},
 			"networks":    []interface{}{"with_ipam"},
 		},
 	},
-	"volumes": map[string]interface{}{
-		"hello": map[string]interface{}{
+	"volumes": types.Dict{
+		"hello": types.Dict{
 			"driver": "default",
-			"driver_opts": map[string]interface{}{
+			"driver_opts": types.Dict{
 				"beep": "boop",
 			},
 		},
 	},
-	"networks": map[string]interface{}{
-		"default": map[string]interface{}{
+	"networks": types.Dict{
+		"default": types.Dict{
 			"driver": "bridge",
-			"driver_opts": map[string]interface{}{
+			"driver_opts": types.Dict{
 				"beep": "boop",
 			},
 		},
-		"with_ipam": map[string]interface{}{
-			"ipam": map[string]interface{}{
+		"with_ipam": types.Dict{
+			"ipam": types.Dict{
 				"driver": "default",
 				"config": []interface{}{
-					map[string]interface{}{
+					types.Dict{
 						"subnet": "172.28.0.0/16",
 					},
 				},
@@ -111,16 +98,12 @@ var sampleDict = map[string]interface{}{
 	},
 }
 
-func strPtr(val string) *string {
-	return &val
-}
-
 var sampleConfig = types.Config{
 	Services: []types.ServiceConfig{
 		{
 			Name:        "foo",
 			Image:       "busybox",
-			Environment: map[string]*string{},
+			Environment: map[string]string{},
 			Networks: map[string]*types.ServiceNetworkConfig{
 				"with_me": nil,
 			},
@@ -128,7 +111,7 @@ var sampleConfig = types.Config{
 		{
 			Name:        "bar",
 			Image:       "busybox",
-			Environment: map[string]*string{"FOO": strPtr("1")},
+			Environment: map[string]string{"FOO": "1"},
 			Networks: map[string]*types.ServiceNetworkConfig{
 				"with_ipam": nil,
 			},
@@ -171,31 +154,13 @@ func TestParseYAML(t *testing.T) {
 }
 
 func TestLoad(t *testing.T) {
-	actual, err := Load(buildConfigDetails(sampleDict, nil))
+	actual, err := Load(buildConfigDetails(sampleDict))
 	if !assert.NoError(t, err) {
 		return
 	}
 	assert.Equal(t, serviceSort(sampleConfig.Services), serviceSort(actual.Services))
 	assert.Equal(t, sampleConfig.Networks, actual.Networks)
 	assert.Equal(t, sampleConfig.Volumes, actual.Volumes)
-}
-
-func TestLoadV31(t *testing.T) {
-	actual, err := loadYAML(`
-version: "3.1"
-services:
-  foo:
-    image: busybox
-    secrets: [super]
-secrets:
-  super:
-    external: true
-`)
-	if !assert.NoError(t, err) {
-		return
-	}
-	assert.Equal(t, len(actual.Services), 1)
-	assert.Equal(t, len(actual.Secrets), 1)
 }
 
 func TestParseAndLoad(t *testing.T) {
@@ -390,8 +355,8 @@ services:
 	assert.Contains(t, err.Error(), "services.foo.image must be a string")
 }
 
-func TestLoadWithEnvironment(t *testing.T) {
-	config, err := loadYAMLWithEnv(`
+func TestValidEnvironment(t *testing.T) {
+	config, err := loadYAML(`
 version: "3"
 services:
   dict-env:
@@ -400,7 +365,6 @@ services:
       FOO: "1"
       BAR: 2
       BAZ: 2.5
-      QUX:
       QUUX:
   list-env:
     image: busybox
@@ -408,17 +372,15 @@ services:
       - FOO=1
       - BAR=2
       - BAZ=2.5
-      - QUX=
-      - QUUX
-`, map[string]string{"QUX": "qux"})
+      - QUUX=
+`)
 	assert.NoError(t, err)
 
-	expected := types.MappingWithEquals{
-		"FOO":  strPtr("1"),
-		"BAR":  strPtr("2"),
-		"BAZ":  strPtr("2.5"),
-		"QUX":  strPtr("qux"),
-		"QUUX": nil,
+	expected := map[string]string{
+		"FOO":  "1",
+		"BAR":  "2",
+		"BAZ":  "2.5",
+		"QUUX": "",
 	}
 
 	assert.Equal(t, 2, len(config.Services))
@@ -454,8 +416,7 @@ services:
 }
 
 func TestEnvironmentInterpolation(t *testing.T) {
-	home := "/home/foo"
-	config, err := loadYAMLWithEnv(`
+	config, err := loadYAML(`
 version: "3"
 services:
   test:
@@ -471,14 +432,13 @@ networks:
 volumes:
   test:
     driver: $HOME
-`, map[string]string{
-		"HOME": home,
-		"FOO":  "foo",
-	})
+`)
 
 	assert.NoError(t, err)
 
-	expectedLabels := types.Labels{
+	home := os.Getenv("HOME")
+
+	expectedLabels := map[string]string{
 		"home1":       home,
 		"home2":       home,
 		"nonexistent": "",
@@ -505,7 +465,7 @@ services:
 `))
 	assert.NoError(t, err)
 
-	configDetails := buildConfigDetails(dict, nil)
+	configDetails := buildConfigDetails(dict)
 
 	_, err = Load(configDetails)
 	assert.NoError(t, err)
@@ -528,7 +488,7 @@ services:
 `))
 	assert.NoError(t, err)
 
-	configDetails := buildConfigDetails(dict, nil)
+	configDetails := buildConfigDetails(dict)
 
 	_, err = Load(configDetails)
 	assert.NoError(t, err)
@@ -563,50 +523,6 @@ services:
 	assert.Contains(t, forbidden, "extends")
 }
 
-func TestInvalidExternalAndDriverCombination(t *testing.T) {
-	_, err := loadYAML(`
-version: "3"
-volumes:
-  external_volume:
-    external: true
-    driver: foobar
-`)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "conflicting parameters \"external\" and \"driver\" specified for volume")
-	assert.Contains(t, err.Error(), "external_volume")
-}
-
-func TestInvalidExternalAndDirverOptsCombination(t *testing.T) {
-	_, err := loadYAML(`
-version: "3"
-volumes:
-  external_volume:
-    external: true
-    driver_opts:
-      beep: boop
-`)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "conflicting parameters \"external\" and \"driver_opts\" specified for volume")
-	assert.Contains(t, err.Error(), "external_volume")
-}
-
-func TestInvalidExternalAndLabelsCombination(t *testing.T) {
-	_, err := loadYAML(`
-version: "3"
-volumes:
-  external_volume:
-    external: true
-    labels:
-      - beep=boop
-`)
-
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "conflicting parameters \"external\" and \"labels\" specified for volume")
-	assert.Contains(t, err.Error(), "external_volume")
-}
-
 func durationPtr(value time.Duration) *time.Duration {
 	return &value
 }
@@ -623,9 +539,7 @@ func TestFullExample(t *testing.T) {
 	bytes, err := ioutil.ReadFile("full-example.yml")
 	assert.NoError(t, err)
 
-	homeDir := "/home/foo"
-	env := map[string]string{"HOME": homeDir, "QUX": "qux_from_environment"}
-	config, err := loadYAMLWithEnv(string(bytes), env)
+	config, err := loadYAML(string(bytes))
 	if !assert.NoError(t, err) {
 		return
 	}
@@ -633,6 +547,7 @@ func TestFullExample(t *testing.T) {
 	workingDir, err := os.Getwd()
 	assert.NoError(t, err)
 
+	homeDir := os.Getenv("HOME")
 	stopGracePeriod := time.Duration(20 * time.Second)
 
 	expectedServiceConfig := types.ServiceConfig{
@@ -674,22 +589,19 @@ func TestFullExample(t *testing.T) {
 			Placement: types.Placement{
 				Constraints: []string{"node=foo"},
 			},
-			EndpointMode: "dnsrr",
 		},
 		Devices:    []string{"/dev/ttyUSB0:/dev/ttyUSB0"},
 		DNS:        []string{"8.8.8.8", "9.9.9.9"},
 		DNSSearch:  []string{"dc1.example.com", "dc2.example.com"},
 		DomainName: "foo.com",
 		Entrypoint: []string{"/code/entrypoint.sh", "-p", "3000"},
-		Environment: map[string]*string{
-			"FOO": strPtr("foo_from_env_file"),
-			"BAR": strPtr("bar_from_env_file_2"),
-			"BAZ": strPtr("baz_from_service_def"),
-			"QUX": strPtr("qux_from_environment"),
-		},
-		EnvFile: []string{
-			"./example1.env",
-			"./example2.env",
+		Environment: map[string]string{
+			"RACK_ENV":       "development",
+			"SHOW":           "true",
+			"SESSION_SECRET": "",
+			"FOO":            "1",
+			"BAR":            "2",
+			"BAZ":            "3",
 		},
 		Expose: []string{"3000", "8000"},
 		ExternalLinks: []string{
@@ -702,7 +614,10 @@ func TestFullExample(t *testing.T) {
 			"somehost":  "162.242.195.82",
 		},
 		HealthCheck: &types.HealthCheckConfig{
-			Test:     types.HealthCheckTest([]string{"CMD-SHELL", "echo \"hello world\""}),
+			Test: []string{
+				"CMD-SHELL",
+				"echo \"hello world\"",
+			},
 			Interval: "10s",
 			Timeout:  "1s",
 			Retries:  uint64Ptr(5),
@@ -741,145 +656,14 @@ func TestFullExample(t *testing.T) {
 			"other-other-network": nil,
 		},
 		Pid: "host",
-		Ports: []types.ServicePortConfig{
-			//"3000",
-			{
-				Mode:     "ingress",
-				Target:   3000,
-				Protocol: "tcp",
-			},
-			//"3000-3005",
-			{
-				Mode:     "ingress",
-				Target:   3000,
-				Protocol: "tcp",
-			},
-			{
-				Mode:     "ingress",
-				Target:   3001,
-				Protocol: "tcp",
-			},
-			{
-				Mode:     "ingress",
-				Target:   3002,
-				Protocol: "tcp",
-			},
-			{
-				Mode:     "ingress",
-				Target:   3003,
-				Protocol: "tcp",
-			},
-			{
-				Mode:     "ingress",
-				Target:   3004,
-				Protocol: "tcp",
-			},
-			{
-				Mode:     "ingress",
-				Target:   3005,
-				Protocol: "tcp",
-			},
-			//"8000:8000",
-			{
-				Mode:      "ingress",
-				Target:    8000,
-				Published: 8000,
-				Protocol:  "tcp",
-			},
-			//"9090-9091:8080-8081",
-			{
-				Mode:      "ingress",
-				Target:    8080,
-				Published: 9090,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    8081,
-				Published: 9091,
-				Protocol:  "tcp",
-			},
-			//"49100:22",
-			{
-				Mode:      "ingress",
-				Target:    22,
-				Published: 49100,
-				Protocol:  "tcp",
-			},
-			//"127.0.0.1:8001:8001",
-			{
-				Mode:      "ingress",
-				Target:    8001,
-				Published: 8001,
-				Protocol:  "tcp",
-			},
-			//"127.0.0.1:5000-5010:5000-5010",
-			{
-				Mode:      "ingress",
-				Target:    5000,
-				Published: 5000,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5001,
-				Published: 5001,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5002,
-				Published: 5002,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5003,
-				Published: 5003,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5004,
-				Published: 5004,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5005,
-				Published: 5005,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5006,
-				Published: 5006,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5007,
-				Published: 5007,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5008,
-				Published: 5008,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5009,
-				Published: 5009,
-				Protocol:  "tcp",
-			},
-			{
-				Mode:      "ingress",
-				Target:    5010,
-				Published: 5010,
-				Protocol:  "tcp",
-			},
+		Ports: []string{
+			"3000",
+			"3000-3005",
+			"8000:8000",
+			"9090-9091:8080-8081",
+			"49100:22",
+			"127.0.0.1:8001:8001",
+			"127.0.0.1:5000-5010:5000-5010",
 		},
 		Privileged: true,
 		ReadOnly:   true,
@@ -903,14 +687,13 @@ func TestFullExample(t *testing.T) {
 			},
 		},
 		User: "someone",
-		Volumes: []types.ServiceVolumeConfig{
-			{Target: "/var/lib/mysql", Type: "volume"},
-			{Source: "/opt/data", Target: "/var/lib/mysql", Type: "bind"},
-			{Source: workingDir, Target: "/code", Type: "bind"},
-			{Source: workingDir + "/static", Target: "/var/www/html", Type: "bind"},
-			{Source: homeDir + "/configs", Target: "/etc/configs/", Type: "bind", ReadOnly: true},
-			{Source: "datavolume", Target: "/var/lib/mysql", Type: "volume"},
-			{Source: workingDir + "/opt", Target: "/opt", Consistency: "cached", Type: "bind"},
+		Volumes: []string{
+			"/var/lib/mysql",
+			"/opt/data:/var/lib/mysql",
+			fmt.Sprintf("%s:/code", workingDir),
+			fmt.Sprintf("%s/static:/var/www/html", workingDir),
+			fmt.Sprintf("%s/configs:/etc/configs/:ro", homeDir),
+			"datavolume:/var/lib/mysql",
 		},
 		WorkingDir: "/code",
 	}
@@ -978,6 +761,15 @@ func TestFullExample(t *testing.T) {
 	assert.Equal(t, expectedVolumeConfig, config.Volumes)
 }
 
+func loadYAML(yaml string) (*types.Config, error) {
+	dict, err := ParseYAML([]byte(yaml))
+	if err != nil {
+		return nil, err
+	}
+
+	return Load(buildConfigDetails(dict))
+}
+
 func serviceSort(services []types.ServiceConfig) []types.ServiceConfig {
 	sort.Sort(servicesByName(services))
 	return services
@@ -988,148 +780,3 @@ type servicesByName []types.ServiceConfig
 func (sbn servicesByName) Len() int           { return len(sbn) }
 func (sbn servicesByName) Swap(i, j int)      { sbn[i], sbn[j] = sbn[j], sbn[i] }
 func (sbn servicesByName) Less(i, j int) bool { return sbn[i].Name < sbn[j].Name }
-
-func TestLoadAttachableNetwork(t *testing.T) {
-	config, err := loadYAML(`
-version: "3.2"
-networks:
-  mynet1:
-    driver: overlay
-    attachable: true
-  mynet2:
-    driver: bridge
-`)
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	expected := map[string]types.NetworkConfig{
-		"mynet1": {
-			Driver:     "overlay",
-			Attachable: true,
-		},
-		"mynet2": {
-			Driver:     "bridge",
-			Attachable: false,
-		},
-	}
-
-	assert.Equal(t, expected, config.Networks)
-}
-
-func TestLoadExpandedPortFormat(t *testing.T) {
-	config, err := loadYAML(`
-version: "3.2"
-services:
-  web:
-    image: busybox
-    ports:
-      - "80-82:8080-8082"
-      - "90-92:8090-8092/udp"
-      - "85:8500"
-      - 8600
-      - protocol: udp
-        target: 53
-        published: 10053
-      - mode: host
-        target: 22
-        published: 10022
-`)
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	expected := []types.ServicePortConfig{
-		{
-			Mode:      "ingress",
-			Target:    8080,
-			Published: 80,
-			Protocol:  "tcp",
-		},
-		{
-			Mode:      "ingress",
-			Target:    8081,
-			Published: 81,
-			Protocol:  "tcp",
-		},
-		{
-			Mode:      "ingress",
-			Target:    8082,
-			Published: 82,
-			Protocol:  "tcp",
-		},
-		{
-			Mode:      "ingress",
-			Target:    8090,
-			Published: 90,
-			Protocol:  "udp",
-		},
-		{
-			Mode:      "ingress",
-			Target:    8091,
-			Published: 91,
-			Protocol:  "udp",
-		},
-		{
-			Mode:      "ingress",
-			Target:    8092,
-			Published: 92,
-			Protocol:  "udp",
-		},
-		{
-			Mode:      "ingress",
-			Target:    8500,
-			Published: 85,
-			Protocol:  "tcp",
-		},
-		{
-			Mode:      "ingress",
-			Target:    8600,
-			Published: 0,
-			Protocol:  "tcp",
-		},
-		{
-			Target:    53,
-			Published: 10053,
-			Protocol:  "udp",
-		},
-		{
-			Mode:      "host",
-			Target:    22,
-			Published: 10022,
-		},
-	}
-
-	assert.Equal(t, 1, len(config.Services))
-	assert.Equal(t, expected, config.Services[0].Ports)
-}
-
-func TestLoadExpandedMountFormat(t *testing.T) {
-	config, err := loadYAML(`
-version: "3.2"
-services:
-  web:
-    image: busybox
-    volumes:
-      - type: volume
-        source: foo
-        target: /target
-        read_only: true
-volumes:
-  foo: {}
-`)
-	if !assert.NoError(t, err) {
-		return
-	}
-
-	expected := types.ServiceVolumeConfig{
-		Type:     "volume",
-		Source:   "foo",
-		Target:   "/target",
-		ReadOnly: true,
-	}
-
-	assert.Equal(t, 1, len(config.Services))
-	assert.Equal(t, 1, len(config.Services[0].Volumes))
-	assert.Equal(t, expected, config.Services[0].Volumes[0])
-}

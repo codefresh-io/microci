@@ -10,7 +10,6 @@ import (
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -31,7 +30,7 @@ func scaleArgs(cmd *cobra.Command, args []string) error {
 	}
 	for _, arg := range args {
 		if parts := strings.SplitN(arg, "=", 2); len(parts) != 2 {
-			return errors.Errorf(
+			return fmt.Errorf(
 				"Invalid scale specifier '%s'.\nSee '%s --help'.\n\nUsage:  %s\n\n%s",
 				arg,
 				cmd.CommandPath(),
@@ -44,7 +43,7 @@ func scaleArgs(cmd *cobra.Command, args []string) error {
 }
 
 func runScale(dockerCli *command.DockerCli, args []string) error {
-	var errs []string
+	var errors []string
 	for _, arg := range args {
 		parts := strings.SplitN(arg, "=", 2)
 		serviceID, scaleStr := parts[0], parts[1]
@@ -52,33 +51,33 @@ func runScale(dockerCli *command.DockerCli, args []string) error {
 		// validate input arg scale number
 		scale, err := strconv.ParseUint(scaleStr, 10, 64)
 		if err != nil {
-			errs = append(errs, fmt.Sprintf("%s: invalid replicas value %s: %v", serviceID, scaleStr, err))
+			errors = append(errors, fmt.Sprintf("%s: invalid replicas value %s: %v", serviceID, scaleStr, err))
 			continue
 		}
 
 		if err := runServiceScale(dockerCli, serviceID, scale); err != nil {
-			errs = append(errs, fmt.Sprintf("%s: %v", serviceID, err))
+			errors = append(errors, fmt.Sprintf("%s: %v", serviceID, err))
 		}
 	}
 
-	if len(errs) == 0 {
+	if len(errors) == 0 {
 		return nil
 	}
-	return errors.Errorf(strings.Join(errs, "\n"))
+	return fmt.Errorf(strings.Join(errors, "\n"))
 }
 
 func runServiceScale(dockerCli *command.DockerCli, serviceID string, scale uint64) error {
 	client := dockerCli.Client()
 	ctx := context.Background()
 
-	service, _, err := client.ServiceInspectWithRaw(ctx, serviceID, types.ServiceInspectOptions{})
+	service, _, err := client.ServiceInspectWithRaw(ctx, serviceID)
 	if err != nil {
 		return err
 	}
 
 	serviceMode := &service.Spec.Mode
 	if serviceMode.Replicated == nil {
-		return errors.Errorf("scale can only be used with replicated mode")
+		return fmt.Errorf("scale can only be used with replicated mode")
 	}
 
 	serviceMode.Replicated.Replicas = &scale

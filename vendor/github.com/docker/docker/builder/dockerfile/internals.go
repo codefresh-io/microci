@@ -6,6 +6,7 @@ package dockerfile
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -13,7 +14,6 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -36,14 +36,13 @@ import (
 	"github.com/docker/docker/pkg/tarsum"
 	"github.com/docker/docker/pkg/urlutil"
 	"github.com/docker/docker/runconfig/opts"
-	"github.com/pkg/errors"
 )
 
 func (b *Builder) commit(id string, autoCmd strslice.StrSlice, comment string) error {
 	if b.disableCommit {
 		return nil
 	}
-	if !b.hasFromImage() {
+	if b.image == "" && !b.noBaseImage {
 		return errors.New("Please provide a source image with `from` prior to commit")
 	}
 	b.runConfig.Image = b.image
@@ -84,7 +83,6 @@ func (b *Builder) commit(id string, autoCmd strslice.StrSlice, comment string) e
 	}
 
 	b.image = imageID
-	b.imageContexts.update(imageID, &autoConfig)
 	return nil
 }
 
@@ -93,7 +91,11 @@ type copyInfo struct {
 	decompress bool
 }
 
-func (b *Builder) runContextCommand(args []string, allowRemote bool, allowLocalDecompression bool, cmdName string, imageSource *imageMount) error {
+func (b *Builder) runContextCommand(args []string, allowRemote bool, allowLocalDecompression bool, cmdName string) error {
+	if b.context == nil {
+		return fmt.Errorf("No context given. Impossible to use %s", cmdName)
+	}
+
 	if len(args) < 2 {
 		return fmt.Errorf("Invalid %s format - at least two arguments required", cmdName)
 	}
@@ -111,6 +113,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowLocalD
 	var err error
 	for _, orig := range args[0 : len(args)-1] {
 		var fi builder.FileInfo
+		decompress := allowLocalDecompression
 		if urlutil.IsURL(orig) {
 			if !allowRemote {
 				return fmt.Errorf("Source can't be a URL for %s", cmdName)
@@ -120,14 +123,12 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowLocalD
 				return err
 			}
 			defer os.RemoveAll(filepath.Dir(fi.Path()))
-			infos = append(infos, copyInfo{
-				FileInfo:   fi,
-				decompress: false,
-			})
+			decompress = false
+			infos = append(infos, copyInfo{fi, decompress})
 			continue
 		}
 		// not a URL
-		subInfos, err := b.calcCopyInfo(cmdName, orig, allowLocalDecompression, true, imageSource)
+		subInfos, err := b.calcCopyInfo(cmdName, orig, allowLocalDecompression, true)
 		if err != nil {
 			return err
 		}
@@ -179,11 +180,7 @@ func (b *Builder) runContextCommand(args []string, allowRemote bool, allowLocalD
 		return nil
 	}
 
-	container, err := b.docker.ContainerCreate(types.ContainerCreateConfig{
-		Config: b.runConfig,
-		// Set a log config to override any default value set on the daemon
-		HostConfig: &container.HostConfig{LogConfig: defaultLogConfig},
-	})
+	container, err := b.docker.ContainerCreate(types.ContainerCreateConfig{Config: b.runConfig})
 	if err != nil {
 		return err
 	}
@@ -297,55 +294,20 @@ func (b *Builder) download(srcURL string) (fi builder.FileInfo, err error) {
 	return &builder.HashedFileInfo{FileInfo: builder.PathFileInfo{FileInfo: tmpFileSt, FilePath: tmpFileName}, FileHash: hash}, nil
 }
 
-var windowsBlacklist = map[string]bool{
-	"c:\\":        true,
-	"c:\\windows": true,
-}
-
-func (b *Builder) calcCopyInfo(cmdName, origPath string, allowLocalDecompression, allowWildcards bool, imageSource *imageMount) ([]copyInfo, error) {
+func (b *Builder) calcCopyInfo(cmdName, origPath string, allowLocalDecompression, allowWildcards bool) ([]copyInfo, error) {
 
 	// Work in daemon-specific OS filepath semantics
 	origPath = filepath.FromSlash(origPath)
-	// validate windows paths from other images
-	if imageSource != nil && runtime.GOOS == "windows" {
-		p := strings.ToLower(filepath.Clean(origPath))
-		if !filepath.IsAbs(p) {
-			if filepath.VolumeName(p) != "" {
-				if p[len(p)-2:] == ":." { // case where clean returns weird c:. paths
-					p = p[:len(p)-1]
-				}
-				p += "\\"
-			} else {
-				p = filepath.Join("c:\\", p)
-			}
-		}
-		if _, blacklisted := windowsBlacklist[p]; blacklisted {
-			return nil, errors.New("copy from c:\\ or c:\\windows is not allowed on windows")
-		}
-	}
 
 	if origPath != "" && origPath[0] == os.PathSeparator && len(origPath) > 1 {
 		origPath = origPath[1:]
 	}
 	origPath = strings.TrimPrefix(origPath, "."+string(os.PathSeparator))
 
-	context := b.context
-	var err error
-	if imageSource != nil {
-		context, err = imageSource.context()
-		if err != nil {
-			return nil, err
-		}
-	}
-
-	if context == nil {
-		return nil, errors.Errorf("No context given. Impossible to use %s", cmdName)
-	}
-
 	// Deal with wildcards
 	if allowWildcards && containsWildcards(origPath) {
 		var copyInfos []copyInfo
-		if err := context.Walk("", func(path string, info builder.FileInfo, err error) error {
+		if err := b.context.Walk("", func(path string, info builder.FileInfo, err error) error {
 			if err != nil {
 				return err
 			}
@@ -359,7 +321,7 @@ func (b *Builder) calcCopyInfo(cmdName, origPath string, allowLocalDecompression
 
 			// Note we set allowWildcards to false in case the name has
 			// a * in it
-			subInfos, err := b.calcCopyInfo(cmdName, path, allowLocalDecompression, false, imageSource)
+			subInfos, err := b.calcCopyInfo(cmdName, path, allowLocalDecompression, false)
 			if err != nil {
 				return err
 			}
@@ -372,7 +334,8 @@ func (b *Builder) calcCopyInfo(cmdName, origPath string, allowLocalDecompression
 	}
 
 	// Must be a dir or a file
-	statPath, fi, err := context.Stat(origPath)
+
+	statPath, fi, err := b.context.Stat(origPath)
 	if err != nil {
 		return nil, err
 	}
@@ -383,13 +346,6 @@ func (b *Builder) calcCopyInfo(cmdName, origPath string, allowLocalDecompression
 	if !handleHash {
 		return copyInfos, nil
 	}
-	if imageSource != nil {
-		// fast-cache based on imageID
-		if h, ok := b.imageContexts.getCache(imageSource.id, origPath); ok {
-			hfi.SetHash(h.(string))
-			return copyInfos, nil
-		}
-	}
 
 	// Deal with the single file case
 	if !fi.IsDir() {
@@ -398,7 +354,7 @@ func (b *Builder) calcCopyInfo(cmdName, origPath string, allowLocalDecompression
 	}
 	// Must be a dir
 	var subfiles []string
-	err = context.Walk(statPath, func(path string, info builder.FileInfo, err error) error {
+	err = b.context.Walk(statPath, func(path string, info builder.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
@@ -414,9 +370,6 @@ func (b *Builder) calcCopyInfo(cmdName, origPath string, allowLocalDecompression
 	hasher := sha256.New()
 	hasher.Write([]byte(strings.Join(subfiles, ",")))
 	hfi.SetHash("dir:" + hex.EncodeToString(hasher.Sum(nil)))
-	if imageSource != nil {
-		b.imageContexts.setCache(imageSource.id, origPath, hfi.Hash())
-	}
 
 	return copyInfos, nil
 }
@@ -460,10 +413,6 @@ func (b *Builder) processImageFrom(img builder.Image) error {
 	// Copy the ONBUILD triggers, and remove them from the config, since the config will be committed.
 	onBuildTriggers := b.runConfig.OnBuild
 	b.runConfig.OnBuild = []string{}
-
-	// Reset stdin settings as all build actions run without stdin
-	b.runConfig.OpenStdin = false
-	b.runConfig.StdinOnce = false
 
 	// parse the ONBUILD triggers by invoking the parser
 	for _, step := range onBuildTriggers {
@@ -510,13 +459,12 @@ func (b *Builder) probeCache() (bool, error) {
 	fmt.Fprint(b.Stdout, " ---> Using cache\n")
 	logrus.Debugf("[BUILDER] Use cached version: %s", b.runConfig.Cmd)
 	b.image = string(cache)
-	b.imageContexts.update(b.image, b.runConfig)
 
 	return true, nil
 }
 
 func (b *Builder) create() (string, error) {
-	if !b.hasFromImage() {
+	if b.image == "" && !b.noBaseImage {
 		return "", errors.New("Please provide a source image with `from` prior to run")
 	}
 	b.runConfig.Image = b.image
@@ -540,9 +488,6 @@ func (b *Builder) create() (string, error) {
 		ShmSize:     b.options.ShmSize,
 		Resources:   resources,
 		NetworkMode: container.NetworkMode(b.options.NetworkMode),
-		// Set a log config to override any default value set on the daemon
-		LogConfig:  defaultLogConfig,
-		ExtraHosts: b.options.ExtraHosts,
 	}
 
 	config := *b.runConfig
@@ -650,7 +595,7 @@ func (b *Builder) clearTmp() {
 }
 
 // readDockerfile reads a Dockerfile from the current context.
-func (b *Builder) readDockerfile() (*parser.Node, error) {
+func (b *Builder) readDockerfile() error {
 	// If no -f was specified then look for 'Dockerfile'. If we can't find
 	// that then look for 'dockerfile'.  If neither are found then default
 	// back to 'Dockerfile' and use that in the error message.
@@ -664,9 +609,10 @@ func (b *Builder) readDockerfile() (*parser.Node, error) {
 		}
 	}
 
-	nodes, err := b.parseDockerfile()
+	err := b.parseDockerfile()
+
 	if err != nil {
-		return nodes, err
+		return err
 	}
 
 	// After the Dockerfile has been parsed, we need to check the .dockerignore
@@ -680,27 +626,44 @@ func (b *Builder) readDockerfile() (*parser.Node, error) {
 	if dockerIgnore, ok := b.context.(builder.DockerIgnoreContext); ok {
 		dockerIgnore.Process([]string{b.options.Dockerfile})
 	}
-	return nodes, nil
+	return nil
 }
 
-func (b *Builder) parseDockerfile() (*parser.Node, error) {
+func (b *Builder) parseDockerfile() error {
 	f, err := b.context.Open(b.options.Dockerfile)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("Cannot locate specified Dockerfile: %s", b.options.Dockerfile)
+			return fmt.Errorf("Cannot locate specified Dockerfile: %s", b.options.Dockerfile)
 		}
-		return nil, err
+		return err
 	}
 	defer f.Close()
 	if f, ok := f.(*os.File); ok {
 		// ignoring error because Open already succeeded
 		fi, err := f.Stat()
 		if err != nil {
-			return nil, fmt.Errorf("Unexpected error reading Dockerfile: %v", err)
+			return fmt.Errorf("Unexpected error reading Dockerfile: %v", err)
 		}
 		if fi.Size() == 0 {
-			return nil, fmt.Errorf("The Dockerfile (%s) cannot be empty", b.options.Dockerfile)
+			return fmt.Errorf("The Dockerfile (%s) cannot be empty", b.options.Dockerfile)
 		}
 	}
-	return parser.Parse(f, &b.directive)
+	b.dockerfile, err = parser.Parse(f, &b.directive)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// determine if build arg is part of built-in args or user
+// defined args in Dockerfile at any point in time.
+func (b *Builder) isBuildArgAllowed(arg string) bool {
+	if _, ok := BuiltinAllowedBuildArgs[arg]; ok {
+		return true
+	}
+	if _, ok := b.allowedBuildArgs[arg]; ok {
+		return true
+	}
+	return false
 }

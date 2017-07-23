@@ -1,1 +1,1 @@
-Alias for `docker container unpause`.
+Alias for `docker container pause`.

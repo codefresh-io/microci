@@ -18,26 +18,27 @@ func TestVolumeContext(t *testing.T) {
 	cases := []struct {
 		volumeCtx volumeContext
 		expValue  string
+		expHeader string
 		call      func() string
 	}{
 		{volumeContext{
 			v: types.Volume{Name: volumeName},
-		}, volumeName, ctx.Name},
+		}, volumeName, volumeNameHeader, ctx.Name},
 		{volumeContext{
 			v: types.Volume{Driver: "driver_name"},
-		}, "driver_name", ctx.Driver},
+		}, "driver_name", driverHeader, ctx.Driver},
 		{volumeContext{
 			v: types.Volume{Scope: "local"},
-		}, "local", ctx.Scope},
+		}, "local", scopeHeader, ctx.Scope},
 		{volumeContext{
 			v: types.Volume{Mountpoint: "mountpoint"},
-		}, "mountpoint", ctx.Mountpoint},
+		}, "mountpoint", mountpointHeader, ctx.Mountpoint},
 		{volumeContext{
 			v: types.Volume{},
-		}, "", ctx.Labels},
+		}, "", labelsHeader, ctx.Labels},
 		{volumeContext{
 			v: types.Volume{Labels: map[string]string{"label1": "value1", "label2": "value2"}},
-		}, "label1=value1,label2=value2", ctx.Labels},
+		}, "label1=value1,label2=value2", labelsHeader, ctx.Labels},
 	}
 
 	for _, c := range cases {
@@ -47,6 +48,11 @@ func TestVolumeContext(t *testing.T) {
 			compareMultipleValues(t, v, c.expValue)
 		} else if v != c.expValue {
 			t.Fatalf("Expected %s, was %s\n", c.expValue, v)
+		}
+
+		h := ctx.FullHeader()
+		if h != c.expHeader {
+			t.Fatalf("Expected %s, was %s\n", c.expHeader, h)
 		}
 	}
 }

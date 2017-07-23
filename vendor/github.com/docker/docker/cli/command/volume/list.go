@@ -3,13 +3,14 @@ package volume
 import (
 	"sort"
 
+	"golang.org/x/net/context"
+
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/cli"
 	"github.com/docker/docker/cli/command"
 	"github.com/docker/docker/cli/command/formatter"
 	"github.com/docker/docker/opts"
 	"github.com/spf13/cobra"
-	"golang.org/x/net/context"
 )
 
 type byVolumeName []*types.Volume
@@ -26,7 +27,7 @@ type listOptions struct {
 	filter opts.FilterOpt
 }
 
-func newListCommand(dockerCli command.Cli) *cobra.Command {
+func newListCommand(dockerCli *command.DockerCli) *cobra.Command {
 	opts := listOptions{filter: opts.NewFilterOpt()}
 
 	cmd := &cobra.Command{
@@ -47,7 +48,7 @@ func newListCommand(dockerCli command.Cli) *cobra.Command {
 	return cmd
 }
 
-func runList(dockerCli command.Cli, opts listOptions) error {
+func runList(dockerCli *command.DockerCli, opts listOptions) error {
 	client := dockerCli.Client()
 	volumes, err := client.VolumeList(context.Background(), opts.filter.Value())
 	if err != nil {

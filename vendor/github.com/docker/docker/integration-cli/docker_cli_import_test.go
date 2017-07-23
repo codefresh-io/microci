@@ -10,7 +10,6 @@ import (
 	"strings"
 
 	"github.com/docker/docker/integration-cli/checker"
-	"github.com/docker/docker/integration-cli/cli"
 	"github.com/docker/docker/pkg/testutil"
 	icmd "github.com/docker/docker/pkg/testutil/cmd"
 	"github.com/go-check/check"
@@ -127,17 +126,22 @@ func (s *DockerSuite) TestImportFileNonExistentFile(c *check.C) {
 
 func (s *DockerSuite) TestImportWithQuotedChanges(c *check.C) {
 	testRequires(c, DaemonIsLinux)
-	cli.DockerCmd(c, "run", "--name", "test-import", "busybox", "true")
+	dockerCmd(c, "run", "--name", "test-import", "busybox", "true")
 
 	temporaryFile, err := ioutil.TempFile("", "exportImportTest")
 	c.Assert(err, checker.IsNil, check.Commentf("failed to create temporary file"))
 	defer os.Remove(temporaryFile.Name())
 
-	cli.Docker(cli.Args("export", "test-import"), cli.WithStdout(bufio.NewWriter(temporaryFile))).Assert(c, icmd.Success)
+	result := icmd.RunCmd(icmd.Cmd{
+		Command: binaryWithArgs("export", "test-import"),
+		Stdout:  bufio.NewWriter(temporaryFile),
+	})
+	c.Assert(result, icmd.Matches, icmd.Success)
 
-	result := cli.DockerCmd(c, "import", "-c", `ENTRYPOINT ["/bin/sh", "-c"]`, temporaryFile.Name())
+	result = dockerCmdWithResult("import", "-c", `ENTRYPOINT ["/bin/sh", "-c"]`, temporaryFile.Name())
+	c.Assert(result, icmd.Matches, icmd.Success)
 	image := strings.TrimSpace(result.Stdout())
 
-	result = cli.DockerCmd(c, "run", "--rm", image, "true")
+	result = dockerCmdWithResult("run", "--rm", image, "true")
 	c.Assert(result, icmd.Matches, icmd.Expected{Out: icmd.None})
 }

@@ -17,10 +17,10 @@ func (s *DockerSwarmSuite) TestSecretCreate(c *check.C) {
 
 	testName := "test_secret"
 	id := d.CreateSecret(c, swarm.SecretSpec{
-		Annotations: swarm.Annotations{
+		swarm.Annotations{
 			Name: testName,
 		},
-		Data: []byte("TESTINGDATA"),
+		[]byte("TESTINGDATA"),
 	})
 	c.Assert(id, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", id))
 
@@ -33,14 +33,14 @@ func (s *DockerSwarmSuite) TestSecretCreateWithLabels(c *check.C) {
 
 	testName := "test_secret"
 	id := d.CreateSecret(c, swarm.SecretSpec{
-		Annotations: swarm.Annotations{
+		swarm.Annotations{
 			Name: testName,
 			Labels: map[string]string{
 				"key1": "value1",
 				"key2": "value2",
 			},
 		},
-		Data: []byte("TESTINGDATA"),
+		[]byte("TESTINGDATA"),
 	})
 	c.Assert(id, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", id))
 
@@ -57,18 +57,18 @@ func (s *DockerSwarmSuite) TestSecretCreateResolve(c *check.C) {
 
 	name := "test_secret"
 	id := d.CreateSecret(c, swarm.SecretSpec{
-		Annotations: swarm.Annotations{
+		swarm.Annotations{
 			Name: name,
 		},
-		Data: []byte("foo"),
+		[]byte("foo"),
 	})
 	c.Assert(id, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", id))
 
 	fake := d.CreateSecret(c, swarm.SecretSpec{
-		Annotations: swarm.Annotations{
+		swarm.Annotations{
 			Name: id,
 		},
-		Data: []byte("fake foo"),
+		[]byte("fake foo"),
 	})
 	c.Assert(fake, checker.Not(checker.Equals), "", check.Commentf("secrets: %s", fake))
 
@@ -101,7 +101,7 @@ func (s *DockerSwarmSuite) TestSecretCreateResolve(c *check.C) {
 
 	// Remove based on ID prefix of the fake one should succeed
 	out, err = d.Cmd("secret", "rm", fake[:5])
-	c.Assert(out, checker.Contains, fake[:5])
+	c.Assert(out, checker.Contains, fake)
 	out, err = d.Cmd("secret", "ls")
 	c.Assert(err, checker.IsNil)
 	c.Assert(out, checker.Not(checker.Contains), name)
@@ -121,11 +121,20 @@ func (s *DockerSwarmSuite) TestSecretCreateWithFile(c *check.C) {
 	c.Assert(err, checker.IsNil, check.Commentf("failed to write to temporary file"))
 
 	testName := "test_secret"
-	out, err := d.Cmd("secret", "create", testName, testFile.Name())
+	out, err := d.Cmd("secret", "create", "--file", testFile.Name(), testName)
 	c.Assert(err, checker.IsNil)
 	c.Assert(strings.TrimSpace(out), checker.Not(checker.Equals), "", check.Commentf(out))
 
 	id := strings.TrimSpace(out)
 	secret := d.GetSecret(c, id)
+	c.Assert(secret.Spec.Name, checker.Equals, testName)
+
+	testName = "test_secret_2"
+	out, err = d.Cmd("secret", "create", testName, "-f", testFile.Name())
+	c.Assert(err, checker.IsNil)
+	c.Assert(strings.TrimSpace(out), checker.Not(checker.Equals), "", check.Commentf(out))
+
+	id = strings.TrimSpace(out)
+	secret = d.GetSecret(c, id)
 	c.Assert(secret.Spec.Name, checker.Equals, testName)
 }

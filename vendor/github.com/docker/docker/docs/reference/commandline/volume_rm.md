@@ -28,18 +28,12 @@ Options:
       --help   Print usage
 ```
 
-## Description
-
 Remove one or more volumes. You cannot remove a volume that is in use by a container.
 
-## Examples
+    $ docker volume rm hello
+    hello
 
-```bash
-  $ docker volume rm hello
-  hello
-```
-
-## Related commands
+## Related information
 
 * [volume create](volume_create.md)
 * [volume inspect](volume_inspect.md)

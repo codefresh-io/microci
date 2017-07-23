@@ -27,13 +27,9 @@ Options:
       --help   Print usage
 ```
 
-## Description
-
 Lists the stacks.
 
-## Examples
-
-The following command shows all stacks and some additional information:
+For example, the following command shows all stacks and some additional information:
 
 ```bash
 $ docker stack ls
@@ -43,7 +39,7 @@ vossibility-stack  6
 myapp              2
 ```
 
-## Related commands
+## Related information
 
 * [stack deploy](stack_deploy.md)
 * [stack ps](stack_ps.md)

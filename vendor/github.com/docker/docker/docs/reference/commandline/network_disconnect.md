@@ -25,19 +25,14 @@ Options:
       --help    Print usage
 ```
 
-## Description
-
-Disconnects a container from a network. The container must be running to
-disconnect it from the network.
-
-## Examples
+Disconnects a container from a network. The container must be running to disconnect it from the network.
 
 ```bash
   $ docker network disconnect multi-host-network container1
 ```
 
 
-## Related commands
+## Related information
 
 * [network inspect](network_inspect.md)
 * [network connect](network_connect.md)

@@ -66,7 +66,7 @@ func main() {
 	app.Name = "MicroCI"
 	app.Version = HumanVersion
 	app.Usage = "Minimalistic CI tool for Docker"
-	app.Description = fmt.Sprintf(`
+	app.UsageText = fmt.Sprintf(`
 MicroCI is a minimalistic Continuous Integration (CI) tool designed and tuned for Docker-based microservices.
 %s
  MicroCI respects DOCKER environment variables:

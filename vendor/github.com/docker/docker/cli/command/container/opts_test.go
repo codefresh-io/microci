@@ -13,10 +13,8 @@ import (
 
 	"github.com/docker/docker/api/types/container"
 	networktypes "github.com/docker/docker/api/types/network"
-	"github.com/docker/docker/pkg/testutil/assert"
 	"github.com/docker/docker/runconfig"
 	"github.com/docker/go-connections/nat"
-	"github.com/pkg/errors"
 	"github.com/spf13/pflag"
 )
 
@@ -30,7 +28,7 @@ func TestValidateAttach(t *testing.T) {
 		"STDERR",
 	}
 	if _, err := validateAttach("invalid"); err == nil {
-		t.Fatal("Expected error with [valid streams are STDIN, STDOUT and STDERR], got nothing")
+		t.Fatalf("Expected error with [valid streams are STDIN, STDOUT and STDERR], got nothing")
 	}
 
 	for _, attach := range valid {
@@ -52,12 +50,7 @@ func parseRun(args []string) (*container.Config, *container.HostConfig, *network
 	if err := flags.Parse(args); err != nil {
 		return nil, nil, nil, err
 	}
-	// TODO: fix tests to accept ContainerConfig
-	containerConfig, err := parse(flags, copts)
-	if err != nil {
-		return nil, nil, nil, err
-	}
-	return containerConfig.Config, containerConfig.HostConfig, containerConfig.NetworkingConfig, err
+	return parse(flags, copts)
 }
 
 func parsetest(t *testing.T, args string) (*container.Config, *container.HostConfig, error) {
@@ -103,28 +96,28 @@ func TestParseRunAttach(t *testing.T) {
 	}
 
 	if _, _, err := parsetest(t, "-a"); err == nil {
-		t.Fatal("Error parsing attach flags, `-a` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-a` should be an error but is not")
 	}
 	if _, _, err := parsetest(t, "-a invalid"); err == nil {
-		t.Fatal("Error parsing attach flags, `-a invalid` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-a invalid` should be an error but is not")
 	}
 	if _, _, err := parsetest(t, "-a invalid -a stdout"); err == nil {
-		t.Fatal("Error parsing attach flags, `-a stdout -a invalid` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-a stdout -a invalid` should be an error but is not")
 	}
 	if _, _, err := parsetest(t, "-a stdout -a stderr -d"); err == nil {
-		t.Fatal("Error parsing attach flags, `-a stdout -a stderr -d` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-a stdout -a stderr -d` should be an error but is not")
 	}
 	if _, _, err := parsetest(t, "-a stdin -d"); err == nil {
-		t.Fatal("Error parsing attach flags, `-a stdin -d` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-a stdin -d` should be an error but is not")
 	}
 	if _, _, err := parsetest(t, "-a stdout -d"); err == nil {
-		t.Fatal("Error parsing attach flags, `-a stdout -d` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-a stdout -d` should be an error but is not")
 	}
 	if _, _, err := parsetest(t, "-a stderr -d"); err == nil {
-		t.Fatal("Error parsing attach flags, `-a stderr -d` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-a stderr -d` should be an error but is not")
 	}
 	if _, _, err := parsetest(t, "-d --rm"); err == nil {
-		t.Fatal("Error parsing attach flags, `-d --rm` should be an error but is not")
+		t.Fatalf("Error parsing attach flags, `-d --rm` should be an error but is not")
 	}
 }
 
@@ -225,7 +218,7 @@ func compareRandomizedStrings(a, b, c, d string) error {
 	if a == d && b == c {
 		return nil
 	}
-	return errors.Errorf("strings don't match")
+	return fmt.Errorf("strings don't match")
 }
 
 // Simple parse with MacAddress validation
@@ -242,24 +235,28 @@ func TestParseWithMacAddress(t *testing.T) {
 
 func TestParseWithMemory(t *testing.T) {
 	invalidMemory := "--memory=invalid"
-	_, _, _, err := parseRun([]string{invalidMemory, "img", "cmd"})
-	assert.Error(t, err, invalidMemory)
-
-	_, hostconfig := mustParse(t, "--memory=1G")
-	assert.Equal(t, hostconfig.Memory, int64(1073741824))
+	validMemory := "--memory=1G"
+	if _, _, _, err := parseRun([]string{invalidMemory, "img", "cmd"}); err != nil && err.Error() != "invalid size: 'invalid'" {
+		t.Fatalf("Expected an error with '%v' Memory, got '%v'", invalidMemory, err)
+	}
+	if _, hostconfig := mustParse(t, validMemory); hostconfig.Memory != 1073741824 {
+		t.Fatalf("Expected the config to have '1G' as Memory, got '%v'", hostconfig.Memory)
+	}
 }
 
 func TestParseWithMemorySwap(t *testing.T) {
 	invalidMemory := "--memory-swap=invalid"
-
-	_, _, _, err := parseRun([]string{invalidMemory, "img", "cmd"})
-	assert.Error(t, err, invalidMemory)
-
-	_, hostconfig := mustParse(t, "--memory-swap=1G")
-	assert.Equal(t, hostconfig.MemorySwap, int64(1073741824))
-
-	_, hostconfig = mustParse(t, "--memory-swap=-1")
-	assert.Equal(t, hostconfig.MemorySwap, int64(-1))
+	validMemory := "--memory-swap=1G"
+	anotherValidMemory := "--memory-swap=-1"
+	if _, _, _, err := parseRun([]string{invalidMemory, "img", "cmd"}); err == nil || err.Error() != "invalid size: 'invalid'" {
+		t.Fatalf("Expected an error with '%v' MemorySwap, got '%v'", invalidMemory, err)
+	}
+	if _, hostconfig := mustParse(t, validMemory); hostconfig.MemorySwap != 1073741824 {
+		t.Fatalf("Expected the config to have '1073741824' as MemorySwap, got '%v'", hostconfig.MemorySwap)
+	}
+	if _, hostconfig := mustParse(t, anotherValidMemory); hostconfig.MemorySwap != -1 {
+		t.Fatalf("Expected the config to have '-1' as MemorySwap, got '%v'", hostconfig.MemorySwap)
+	}
 }
 
 func TestParseHostname(t *testing.T) {
@@ -414,9 +411,8 @@ func TestParseModes(t *testing.T) {
 		t.Fatalf("Expected a valid UTSMode, got %v", hostconfig.UTSMode)
 	}
 	// shm-size ko
-	expectedErr := `invalid argument "a128m" for --shm-size=a128m: invalid size: 'a128m'`
-	if _, _, _, err = parseRun([]string{"--shm-size=a128m", "img", "cmd"}); err == nil || err.Error() != expectedErr {
-		t.Fatalf("Expected an error with message '%v', got %v", expectedErr, err)
+	if _, _, _, err = parseRun([]string{"--shm-size=a128m", "img", "cmd"}); err == nil || err.Error() != "invalid size: 'a128m'" {
+		t.Fatalf("Expected an error with message 'invalid size: a128m', got %v", err)
 	}
 	// shm-size ok
 	_, hostconfig, _, err = parseRun([]string{"--shm-size=128m", "img", "cmd"})
@@ -460,14 +456,6 @@ func TestParseRestartPolicy(t *testing.T) {
 	}
 }
 
-func TestParseRestartPolicyAutoRemove(t *testing.T) {
-	expected := "Conflicting options: --restart and --rm"
-	_, _, _, err := parseRun([]string{"--rm", "--restart=always", "img", "cmd"})
-	if err == nil || err.Error() != expected {
-		t.Fatalf("Expected error %v, but got none", expected)
-	}
-}
-
 func TestParseHealth(t *testing.T) {
 	checkOk := func(args ...string) *container.HealthConfig {
 		config, _, _, err := parseRun(args)
@@ -495,14 +483,14 @@ func TestParseHealth(t *testing.T) {
 		t.Fatalf("--health-cmd: got %#v", health.Test)
 	}
 	if health.Timeout != 0 {
-		t.Fatalf("--health-cmd: timeout = %s", health.Timeout)
+		t.Fatalf("--health-cmd: timeout = %f", health.Timeout)
 	}
 
 	checkError("--no-healthcheck conflicts with --health-* options",
 		"--no-healthcheck", "--health-cmd=/check.sh -q", "img", "cmd")
 
-	health = checkOk("--health-timeout=2s", "--health-retries=3", "--health-interval=4.5s", "--health-start-period=5s", "img", "cmd")
-	if health.Timeout != 2*time.Second || health.Retries != 3 || health.Interval != 4500*time.Millisecond || health.StartPeriod != 5*time.Second {
+	health = checkOk("--health-timeout=2s", "--health-retries=3", "--health-interval=4.5s", "img", "cmd")
+	if health.Timeout != 2*time.Second || health.Retries != 3 || health.Interval != 4500*time.Millisecond {
 		t.Fatalf("--health-*: got %#v", health)
 	}
 }
@@ -752,14 +740,14 @@ func callDecodeContainerConfig(volumes []string, binds []string) (*container.Con
 		w.Config.Volumes[v] = struct{}{}
 	}
 	if b, err = json.Marshal(w); err != nil {
-		return nil, nil, errors.Errorf("Error on marshal %s", err.Error())
+		return nil, nil, fmt.Errorf("Error on marshal %s", err.Error())
 	}
 	c, h, _, err = runconfig.DecodeContainerConfig(bytes.NewReader(b))
 	if err != nil {
-		return nil, nil, errors.Errorf("Error parsing %s: %v", string(b), err)
+		return nil, nil, fmt.Errorf("Error parsing %s: %v", string(b), err)
 	}
 	if c == nil || h == nil {
-		return nil, nil, errors.Errorf("Empty config or hostconfig")
+		return nil, nil, fmt.Errorf("Empty config or hostconfig")
 	}
 
 	return c, h, err

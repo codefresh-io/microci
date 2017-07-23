@@ -3,6 +3,7 @@ package configfile
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
 	"os"
@@ -10,7 +11,6 @@ import (
 	"strings"
 
 	"github.com/docker/docker/api/types"
-	"github.com/pkg/errors"
 )
 
 const (
@@ -27,7 +27,6 @@ type ConfigFile struct {
 	PsFormat             string                      `json:"psFormat,omitempty"`
 	ImagesFormat         string                      `json:"imagesFormat,omitempty"`
 	NetworksFormat       string                      `json:"networksFormat,omitempty"`
-	PluginsFormat        string                      `json:"pluginsFormat,omitempty"`
 	VolumesFormat        string                      `json:"volumesFormat,omitempty"`
 	StatsFormat          string                      `json:"statsFormat,omitempty"`
 	DetachKeys           string                      `json:"detachKeys,omitempty"`
@@ -35,11 +34,6 @@ type ConfigFile struct {
 	CredentialHelpers    map[string]string           `json:"credHelpers,omitempty"`
 	Filename             string                      `json:"-"` // Note: for internal use only
 	ServiceInspectFormat string                      `json:"serviceInspectFormat,omitempty"`
-	ServicesFormat       string                      `json:"servicesFormat,omitempty"`
-	TasksFormat          string                      `json:"tasksFormat,omitempty"`
-	SecretFormat         string                      `json:"secretFormat,omitempty"`
-	NodesFormat          string                      `json:"nodesFormat,omitempty"`
-	PruneFilters         []string                    `json:"pruneFilters,omitempty"`
 }
 
 // LegacyLoadFromReader reads the non-nested configuration data given and sets up the
@@ -53,12 +47,12 @@ func (configFile *ConfigFile) LegacyLoadFromReader(configData io.Reader) error {
 	if err := json.Unmarshal(b, &configFile.AuthConfigs); err != nil {
 		arr := strings.Split(string(b), "\n")
 		if len(arr) < 2 {
-			return errors.Errorf("The Auth config file is empty")
+			return fmt.Errorf("The Auth config file is empty")
 		}
 		authConfig := types.AuthConfig{}
 		origAuth := strings.Split(arr[0], " = ")
 		if len(origAuth) != 2 {
-			return errors.Errorf("Invalid Auth config file")
+			return fmt.Errorf("Invalid Auth config file")
 		}
 		authConfig.Username, authConfig.Password, err = decodeAuth(origAuth[1])
 		if err != nil {
@@ -137,7 +131,7 @@ func (configFile *ConfigFile) SaveToWriter(writer io.Writer) error {
 // Save encodes and writes out all the authorization information
 func (configFile *ConfigFile) Save() error {
 	if configFile.Filename == "" {
-		return errors.Errorf("Can't save config with empty filename")
+		return fmt.Errorf("Can't save config with empty filename")
 	}
 
 	if err := os.MkdirAll(filepath.Dir(configFile.Filename), 0700); err != nil {
@@ -178,11 +172,11 @@ func decodeAuth(authStr string) (string, string, error) {
 		return "", "", err
 	}
 	if n > decLen {
-		return "", "", errors.Errorf("Something went wrong decoding auth config")
+		return "", "", fmt.Errorf("Something went wrong decoding auth config")
 	}
 	arr := strings.SplitN(string(decoded), ":", 2)
 	if len(arr) != 2 {
-		return "", "", errors.Errorf("Invalid auth configuration file")
+		return "", "", fmt.Errorf("Invalid auth configuration file")
 	}
 	password := strings.Trim(arr[1], "\x00")
 	return arr[0], password, nil

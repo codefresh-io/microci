@@ -39,7 +39,7 @@ func TestCloseRootDirectory(t *testing.T) {
 	_, err = os.Stat(contextDir)
 
 	if !os.IsNotExist(err) {
-		t.Fatal("Directory should not exist at this point")
+		t.Fatalf("Directory should not exist at this point")
 		defer os.RemoveAll(contextDir)
 	}
 }
@@ -157,7 +157,7 @@ func TestStatNotExisting(t *testing.T) {
 	}
 
 	if fileInfo != nil {
-		t.Fatal("File info should be nil")
+		t.Fatalf("File info should be nil")
 	}
 
 	if !os.IsNotExist(err) {
@@ -188,7 +188,7 @@ func TestRemoveDirectory(t *testing.T) {
 	_, err = os.Stat(contextSubdir)
 
 	if !os.IsNotExist(err) {
-		t.Fatal("Directory should not exist at this point")
+		t.Fatalf("Directory should not exist at this point")
 	}
 }
 
@@ -213,7 +213,7 @@ func TestMakeTarSumContext(t *testing.T) {
 	}
 
 	if tarSum == nil {
-		t.Fatal("Tar sum context should not be nil")
+		t.Fatalf("Tar sum context should not be nil")
 	}
 }
 
@@ -260,6 +260,6 @@ func TestWalkWithError(t *testing.T) {
 	err := tarSum.Walk(contextSubdir, walkFun)
 
 	if err == nil {
-		t.Fatal("Error should not be nil")
+		t.Fatalf("Error should not be nil")
 	}
 }

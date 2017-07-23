@@ -13,7 +13,6 @@ import (
 
 	cliconfig "github.com/docker/docker/cli/config"
 	"github.com/docker/docker/integration-cli/checker"
-	icmd "github.com/docker/docker/pkg/testutil/cmd"
 	"github.com/docker/go-connections/tlsconfig"
 	"github.com/go-check/check"
 )
@@ -34,30 +33,6 @@ type testNotary struct {
 
 const notaryHost = "localhost:4443"
 const notaryURL = "https://" + notaryHost
-
-var SuccessTagging = icmd.Expected{
-	Out: "Tagging",
-}
-
-var SuccessSigningAndPushing = icmd.Expected{
-	Out: "Signing and pushing trust metadata",
-}
-
-var SuccessDownloaded = icmd.Expected{
-	Out: "Status: Downloaded",
-}
-
-var SuccessTaggingOnStderr = icmd.Expected{
-	Err: "Tagging",
-}
-
-var SuccessSigningAndPushingOnStderr = icmd.Expected{
-	Err: "Signing and pushing trust metadata",
-}
-
-var SuccessDownloadedOnStderr = icmd.Expected{
-	Err: "Status: Downloaded",
-}
 
 func newTestNotary(c *check.C) (*testNotary, error) {
 	// generate server config
@@ -186,42 +161,31 @@ func (t *testNotary) Ping() error {
 
 func (t *testNotary) Close() {
 	t.cmd.Process.Kill()
-	t.cmd.Process.Wait()
 	os.RemoveAll(t.dir)
 }
 
-// Deprecated: used trustedCmd instead
-func trustedExecCmd(cmd *exec.Cmd) {
+func (s *DockerTrustSuite) trustedCmd(cmd *exec.Cmd) {
 	pwd := "12345678"
-	cmd.Env = append(cmd.Env, trustEnv(notaryURL, pwd, pwd)...)
+	trustCmdEnv(cmd, notaryURL, pwd, pwd)
 }
 
-func trustedCmd(cmd *icmd.Cmd) {
+func (s *DockerTrustSuite) trustedCmdWithServer(cmd *exec.Cmd, server string) {
 	pwd := "12345678"
-	cmd.Env = append(cmd.Env, trustEnv(notaryURL, pwd, pwd)...)
+	trustCmdEnv(cmd, server, pwd, pwd)
 }
 
-func trustedCmdWithServer(server string) func(*icmd.Cmd) {
-	return func(cmd *icmd.Cmd) {
-		pwd := "12345678"
-		cmd.Env = append(cmd.Env, trustEnv(server, pwd, pwd)...)
-	}
+func (s *DockerTrustSuite) trustedCmdWithPassphrases(cmd *exec.Cmd, rootPwd, repositoryPwd string) {
+	trustCmdEnv(cmd, notaryURL, rootPwd, repositoryPwd)
 }
 
-func trustedCmdWithPassphrases(rootPwd, repositoryPwd string) func(*icmd.Cmd) {
-	return func(cmd *icmd.Cmd) {
-		cmd.Env = append(cmd.Env, trustEnv(notaryURL, rootPwd, repositoryPwd)...)
-	}
-}
-
-func trustEnv(server, rootPwd, repositoryPwd string) []string {
-	env := append(os.Environ(), []string{
+func trustCmdEnv(cmd *exec.Cmd, server, rootPwd, repositoryPwd string) {
+	env := []string{
 		"DOCKER_CONTENT_TRUST=1",
 		fmt.Sprintf("DOCKER_CONTENT_TRUST_SERVER=%s", server),
 		fmt.Sprintf("DOCKER_CONTENT_TRUST_ROOT_PASSPHRASE=%s", rootPwd),
 		fmt.Sprintf("DOCKER_CONTENT_TRUST_REPOSITORY_PASSPHRASE=%s", repositoryPwd),
-	}...)
-	return env
+	}
+	cmd.Env = append(os.Environ(), env...)
 }
 
 func (s *DockerTrustSuite) setupTrustedImage(c *check.C, name string) string {
@@ -229,7 +193,16 @@ func (s *DockerTrustSuite) setupTrustedImage(c *check.C, name string) string {
 	// tag the image and upload it to the private registry
 	dockerCmd(c, "tag", "busybox", repoName)
 
-	icmd.RunCmd(icmd.Command(dockerBinary, "push", repoName), trustedCmd).Assert(c, SuccessSigningAndPushing)
+	pushCmd := exec.Command(dockerBinary, "push", repoName)
+	s.trustedCmd(pushCmd)
+	out, _, err := runCommandWithOutput(pushCmd)
+
+	if err != nil {
+		c.Fatalf("Error running trusted push: %s\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "Signing and pushing trust metadata") {
+		c.Fatalf("Missing expected output on trusted push:\n%s", out)
+	}
 
 	if out, status := dockerCmd(c, "rmi", repoName); status != 0 {
 		c.Fatalf("Error removing image %q\n%s", repoName, out)
@@ -243,7 +216,16 @@ func (s *DockerTrustSuite) setupTrustedplugin(c *check.C, source, name string) s
 	// tag the image and upload it to the private registry
 	dockerCmd(c, "plugin", "install", "--grant-all-permissions", "--alias", repoName, source)
 
-	icmd.RunCmd(icmd.Command(dockerBinary, "plugin", "push", repoName), trustedCmd).Assert(c, SuccessSigningAndPushing)
+	pushCmd := exec.Command(dockerBinary, "plugin", "push", repoName)
+	s.trustedCmd(pushCmd)
+	out, _, err := runCommandWithOutput(pushCmd)
+
+	if err != nil {
+		c.Fatalf("Error running trusted plugin push: %s\n%s", err, out)
+	}
+	if !strings.Contains(string(out), "Signing and pushing trust metadata") {
+		c.Fatalf("Missing expected output on trusted push:\n%s", out)
+	}
 
 	if out, status := dockerCmd(c, "plugin", "rm", "-f", repoName); status != 0 {
 		c.Fatalf("Error removing plugin %q\n%s", repoName, out)
@@ -252,7 +234,7 @@ func (s *DockerTrustSuite) setupTrustedplugin(c *check.C, source, name string) s
 	return repoName
 }
 
-func (s *DockerTrustSuite) notaryCmd(c *check.C, args ...string) string {
+func notaryClientEnv(cmd *exec.Cmd) {
 	pwd := "12345678"
 	env := []string{
 		fmt.Sprintf("NOTARY_ROOT_PASSPHRASE=%s", pwd),
@@ -260,16 +242,16 @@ func (s *DockerTrustSuite) notaryCmd(c *check.C, args ...string) string {
 		fmt.Sprintf("NOTARY_SNAPSHOT_PASSPHRASE=%s", pwd),
 		fmt.Sprintf("NOTARY_DELEGATION_PASSPHRASE=%s", pwd),
 	}
-	result := icmd.RunCmd(icmd.Cmd{
-		Command: append([]string{notaryBinary, "-c", filepath.Join(s.not.dir, "client-config.json")}, args...),
-		Env:     append(os.Environ(), env...),
-	})
-	result.Assert(c, icmd.Success)
-	return result.Combined()
+	cmd.Env = append(os.Environ(), env...)
 }
 
 func (s *DockerTrustSuite) notaryInitRepo(c *check.C, repoName string) {
-	s.notaryCmd(c, "init", repoName)
+	initCmd := exec.Command(notaryBinary, "-c", filepath.Join(s.not.dir, "client-config.json"), "init", repoName)
+	notaryClientEnv(initCmd)
+	out, _, err := runCommandWithOutput(initCmd)
+	if err != nil {
+		c.Fatalf("Error initializing notary repository: %s\n", out)
+	}
 }
 
 func (s *DockerTrustSuite) notaryCreateDelegation(c *check.C, repoName, role string, pubKey string, paths ...string) {
@@ -278,19 +260,42 @@ func (s *DockerTrustSuite) notaryCreateDelegation(c *check.C, repoName, role str
 		pathsArg = "--paths=" + strings.Join(paths, ",")
 	}
 
-	s.notaryCmd(c, "delegation", "add", repoName, role, pubKey, pathsArg)
+	delgCmd := exec.Command(notaryBinary, "-c", filepath.Join(s.not.dir, "client-config.json"),
+		"delegation", "add", repoName, role, pubKey, pathsArg)
+	notaryClientEnv(delgCmd)
+	out, _, err := runCommandWithOutput(delgCmd)
+	if err != nil {
+		c.Fatalf("Error adding %s role to notary repository: %s\n", role, out)
+	}
 }
 
 func (s *DockerTrustSuite) notaryPublish(c *check.C, repoName string) {
-	s.notaryCmd(c, "publish", repoName)
+	pubCmd := exec.Command(notaryBinary, "-c", filepath.Join(s.not.dir, "client-config.json"), "publish", repoName)
+	notaryClientEnv(pubCmd)
+	out, _, err := runCommandWithOutput(pubCmd)
+	if err != nil {
+		c.Fatalf("Error publishing notary repository: %s\n", out)
+	}
 }
 
 func (s *DockerTrustSuite) notaryImportKey(c *check.C, repoName, role string, privKey string) {
-	s.notaryCmd(c, "key", "import", privKey, "-g", repoName, "-r", role)
+	impCmd := exec.Command(notaryBinary, "-c", filepath.Join(s.not.dir, "client-config.json"), "key",
+		"import", privKey, "-g", repoName, "-r", role)
+	notaryClientEnv(impCmd)
+	out, _, err := runCommandWithOutput(impCmd)
+	if err != nil {
+		c.Fatalf("Error importing key to notary repository: %s\n", out)
+	}
 }
 
 func (s *DockerTrustSuite) notaryListTargetsInRole(c *check.C, repoName, role string) map[string]string {
-	out := s.notaryCmd(c, "list", repoName, "-r", role)
+	listCmd := exec.Command(notaryBinary, "-c", filepath.Join(s.not.dir, "client-config.json"), "list",
+		repoName, "-r", role)
+	notaryClientEnv(listCmd)
+	out, _, err := runCommandWithOutput(listCmd)
+	if err != nil {
+		c.Fatalf("Error listing targets in notary repository: %s\n", out)
+	}
 
 	// should look something like:
 	//    NAME                                 DIGEST                                SIZE (BYTES)    ROLE

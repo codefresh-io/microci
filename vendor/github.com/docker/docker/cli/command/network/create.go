@@ -13,7 +13,6 @@ import (
 	"github.com/docker/docker/cli/command"
 	"github.com/docker/docker/opts"
 	runconfigopts "github.com/docker/docker/runconfig/opts"
-	"github.com/pkg/errors"
 	"github.com/spf13/cobra"
 )
 
@@ -25,7 +24,6 @@ type createOptions struct {
 	internal   bool
 	ipv6       bool
 	attachable bool
-	ingress    bool
 
 	ipamDriver  string
 	ipamSubnet  []string
@@ -60,9 +58,6 @@ func newCreateCommand(dockerCli *command.DockerCli) *cobra.Command {
 	flags.BoolVar(&opts.internal, "internal", false, "Restrict external access to the network")
 	flags.BoolVar(&opts.ipv6, "ipv6", false, "Enable IPv6 networking")
 	flags.BoolVar(&opts.attachable, "attachable", false, "Enable manual container attachment")
-	flags.SetAnnotation("attachable", "version", []string{"1.25"})
-	flags.BoolVar(&opts.ingress, "ingress", false, "Create swarm routing-mesh network")
-	flags.SetAnnotation("ingress", "version", []string{"1.29"})
 
 	flags.StringVar(&opts.ipamDriver, "ipam-driver", "default", "IP Address Management Driver")
 	flags.StringSliceVar(&opts.ipamSubnet, "subnet", []string{}, "Subnet in CIDR format that represents a network segment")
@@ -96,7 +91,6 @@ func runCreate(dockerCli *command.DockerCli, opts createOptions) error {
 		Internal:       opts.internal,
 		EnableIPv6:     opts.ipv6,
 		Attachable:     opts.attachable,
-		Ingress:        opts.ingress,
 		Labels:         runconfigopts.ConvertKVStringsToMap(opts.labels.GetAll()),
 	}
 
@@ -111,11 +105,11 @@ func runCreate(dockerCli *command.DockerCli, opts createOptions) error {
 // Consolidates the ipam configuration as a group from different related configurations
 // user can configure network with multiple non-overlapping subnets and hence it is
 // possible to correlate the various related parameters and consolidate them.
-// consolidateIpam consolidates subnets, ip-ranges, gateways and auxiliary addresses into
+// consoidateIpam consolidates subnets, ip-ranges, gateways and auxiliary addresses into
 // structured ipam data.
 func consolidateIpam(subnets, ranges, gateways []string, auxaddrs map[string]string) ([]network.IPAMConfig, error) {
 	if len(subnets) < len(ranges) || len(subnets) < len(gateways) {
-		return nil, errors.Errorf("every ip-range or gateway must have a corresponding subnet")
+		return nil, fmt.Errorf("every ip-range or gateway must have a corresponding subnet")
 	}
 	iData := map[string]*network.IPAMConfig{}
 
@@ -131,7 +125,7 @@ func consolidateIpam(subnets, ranges, gateways []string, auxaddrs map[string]str
 				return nil, err
 			}
 			if ok1 || ok2 {
-				return nil, errors.Errorf("multiple overlapping subnet configuration is not supported")
+				return nil, fmt.Errorf("multiple overlapping subnet configuration is not supported")
 			}
 		}
 		iData[s] = &network.IPAMConfig{Subnet: s, AuxAddress: map[string]string{}}
@@ -149,14 +143,14 @@ func consolidateIpam(subnets, ranges, gateways []string, auxaddrs map[string]str
 				continue
 			}
 			if iData[s].IPRange != "" {
-				return nil, errors.Errorf("cannot configure multiple ranges (%s, %s) on the same subnet (%s)", r, iData[s].IPRange, s)
+				return nil, fmt.Errorf("cannot configure multiple ranges (%s, %s) on the same subnet (%s)", r, iData[s].IPRange, s)
 			}
 			d := iData[s]
 			d.IPRange = r
 			match = true
 		}
 		if !match {
-			return nil, errors.Errorf("no matching subnet for range %s", r)
+			return nil, fmt.Errorf("no matching subnet for range %s", r)
 		}
 	}
 
@@ -172,14 +166,14 @@ func consolidateIpam(subnets, ranges, gateways []string, auxaddrs map[string]str
 				continue
 			}
 			if iData[s].Gateway != "" {
-				return nil, errors.Errorf("cannot configure multiple gateways (%s, %s) for the same subnet (%s)", g, iData[s].Gateway, s)
+				return nil, fmt.Errorf("cannot configure multiple gateways (%s, %s) for the same subnet (%s)", g, iData[s].Gateway, s)
 			}
 			d := iData[s]
 			d.Gateway = g
 			match = true
 		}
 		if !match {
-			return nil, errors.Errorf("no matching subnet for gateway %s", g)
+			return nil, fmt.Errorf("no matching subnet for gateway %s", g)
 		}
 	}
 
@@ -198,7 +192,7 @@ func consolidateIpam(subnets, ranges, gateways []string, auxaddrs map[string]str
 			match = true
 		}
 		if !match {
-			return nil, errors.Errorf("no matching subnet for aux-address %s", aa)
+			return nil, fmt.Errorf("no matching subnet for aux-address %s", aa)
 		}
 	}
 
@@ -216,13 +210,13 @@ func subnetMatches(subnet, data string) (bool, error) {
 
 	_, s, err := net.ParseCIDR(subnet)
 	if err != nil {
-		return false, errors.Errorf("Invalid subnet %s : %v", s, err)
+		return false, fmt.Errorf("Invalid subnet %s : %v", s, err)
 	}
 
 	if strings.Contains(data, "/") {
 		ip, _, err = net.ParseCIDR(data)
 		if err != nil {
-			return false, errors.Errorf("Invalid cidr %s : %v", data, err)
+			return false, fmt.Errorf("Invalid cidr %s : %v", data, err)
 		}
 	} else {
 		ip = net.ParseIP(data)

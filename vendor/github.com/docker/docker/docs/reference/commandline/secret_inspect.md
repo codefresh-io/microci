@@ -25,7 +25,6 @@ Options:
       --help            Print usage
 ```
 
-## Description
 
 Inspects the specified secret. This command has to be run targeting a manager
 node.
@@ -36,11 +35,9 @@ the given template will be executed for each result.
 Go's [text/template](http://golang.org/pkg/text/template/) package
 describes all the details of the format.
 
-For detailed information about using secrets, refer to [manage sensitive data with Docker secrets](https://docs.docker.com/engine/swarm/secrets/).
-
 ## Examples
 
-### Inspect a secret by name or ID
+### Inspecting a secret by name or ID
 
 You can inspect a secret, either by its *name*, or *ID*
 
@@ -48,47 +45,40 @@ For example, given the following secret:
 
 ```bash
 $ docker secret ls
-
-ID                          NAME                CREATED             UPDATED
-eo7jnzguqgtpdah3cm5srfb97   my_secret           3 minutes ago       3 minutes ago
+ID                          NAME                    CREATED                                   UPDATED
+mhv17xfe3gh6xc4rij5orpfds   secret.json             2016-10-27 23:25:43.909181089 +0000 UTC   2016-10-27 23:25:43.909181089 +0000 UTC
 ```
 
-```none
+```bash
 $ docker secret inspect secret.json
-
 [
     {
-        "ID": "eo7jnzguqgtpdah3cm5srfb97",
-        "Version": {
-            "Index": 17
+        "ID": "mhv17xfe3gh6xc4rij5orpfds",
+            "Version": {
+            "Index": 1198
         },
-        "CreatedAt": "2017-03-24T08:15:09.735271783Z",
-        "UpdatedAt": "2017-03-24T08:15:09.735271783Z",
+        "CreatedAt": "2016-10-27T23:25:43.909181089Z",
+        "UpdatedAt": "2016-10-27T23:25:43.909181089Z",
         "Spec": {
-            "Name": "my_secret",
-            "Labels": {
-                "env": "dev",
-                "rev": "20170324"
-            }
+            "Name": "secret.json"
         }
     }
 ]
 ```
 
-### Formatting
+### Formatting secret output
 
 You can use the --format option to obtain specific information about a
 secret. The following example command outputs the creation time of the
 secret.
 
-```bash
-$ docker secret inspect --format='{{.CreatedAt}}' eo7jnzguqgtpdah3cm5srfb97
+```bash{% raw %}
+$ docker secret inspect --format='{{.CreatedAt}}' mhv17xfe3gh6xc4rij5orpfds
+2016-10-27 23:25:43.909181089 +0000 UTC
+{% endraw %}```
 
-2017-03-24 08:15:09.735271783 +0000 UTC
-```
 
-
-## Related commands
+## Related information
 
 * [secret create](secret_create.md)
 * [secret ls](secret_ls.md)

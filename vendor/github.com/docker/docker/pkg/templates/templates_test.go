@@ -3,57 +3,36 @@ package templates
 import (
 	"bytes"
 	"testing"
-
-	"github.com/docker/docker/pkg/testutil/assert"
 )
 
 func TestParseStringFunctions(t *testing.T) {
 	tm, err := Parse(`{{join (split . ":") "/"}}`)
-	assert.NilError(t, err)
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	var b bytes.Buffer
-	assert.NilError(t, tm.Execute(&b, "text:with:colon"))
+	if err := tm.Execute(&b, "text:with:colon"); err != nil {
+		t.Fatal(err)
+	}
 	want := "text/with/colon"
-	assert.Equal(t, b.String(), want)
+	if b.String() != want {
+		t.Fatalf("expected %s, got %s", want, b.String())
+	}
 }
 
 func TestNewParse(t *testing.T) {
 	tm, err := NewParse("foo", "this is a {{ . }}")
-	assert.NilError(t, err)
-
-	var b bytes.Buffer
-	assert.NilError(t, tm.Execute(&b, "string"))
-	want := "this is a string"
-	assert.Equal(t, b.String(), want)
-}
-
-func TestParseTruncateFunction(t *testing.T) {
-	source := "tupx5xzf6hvsrhnruz5cr8gwp"
-
-	testCases := []struct {
-		template string
-		expected string
-	}{
-		{
-			template: `{{truncate . 5}}`,
-			expected: "tupx5",
-		},
-		{
-			template: `{{truncate . 25}}`,
-			expected: "tupx5xzf6hvsrhnruz5cr8gwp",
-		},
-		{
-			template: `{{truncate . 30}}`,
-			expected: "tupx5xzf6hvsrhnruz5cr8gwp",
-		},
+	if err != nil {
+		t.Fatal(err)
 	}
 
-	for _, testCase := range testCases {
-		tm, err := Parse(testCase.template)
-		assert.NilError(t, err)
-
-		var b bytes.Buffer
-		assert.NilError(t, tm.Execute(&b, source))
-		assert.Equal(t, b.String(), testCase.expected)
+	var b bytes.Buffer
+	if err := tm.Execute(&b, "string"); err != nil {
+		t.Fatal(err)
+	}
+	want := "this is a string"
+	if b.String() != want {
+		t.Fatalf("expected %s, got %s", want, b.String())
 	}
 }
