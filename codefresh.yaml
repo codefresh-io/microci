@@ -10,6 +10,7 @@ steps:
     image-name: codefreshio/microci
     build_arguments:
       - GH_SHA=${{CF_REVISION}}
+      - CODECOV_TOKEN=${{CODECOV_TOKEN}}
 
   dockerhub-push:
     type: push
