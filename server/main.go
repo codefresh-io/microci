@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
+	"sync"
 	"syscall"
 
 	log "github.com/Sirupsen/logrus"
@@ -20,10 +21,19 @@ const (
 	gitHubPath = "/github"
 )
 
-var (
-	gClient         DockerClient
-	gCancelCommands []interface{}
-)
+// Concurrent slice with all cancel commands from contexes
+var gCancelCommands = NewConcurrentSlice()
+
+// Singleton Docker Client
+var once sync.Once
+var dockerClient DockerClient
+
+var getDockerClient = func() DockerClient {
+	once.Do(func() {
+		dockerClient = NewClient()
+	})
+	return dockerClient
+}
 
 var (
 	// Version that is passed on compile time through -ldflags
@@ -160,9 +170,6 @@ func before(c *cli.Context) error {
 		log.SetFormatter(&log.JSONFormatter{})
 	}
 
-	// create new Docker client
-	gClient = NewClient()
-
 	// handle stop signals
 	handleSignals(make(chan os.Signal, 1), true)
 	return nil
@@ -176,9 +183,9 @@ func handleSignals(sigs chan os.Signal, exitOnSignal bool) {
 		sid := <-sigs
 		log.Debugf("Received signal: %d", sid)
 		if sid == syscall.SIGTERM || sid == syscall.SIGKILL {
-			for _, cancelFn := range gCancelCommands {
+			for item := range gCancelCommands.Iter() {
 				log.Debug("Canceling running command")
-				cancelFn.(context.CancelFunc)()
+				item.Value.(context.CancelFunc)()
 			}
 			fmt.Println("\nGracefully exiting :-)")
 			if exitOnSignal {
@@ -212,13 +219,13 @@ func webhookServer(c *cli.Context) {
 	repository := c.String("repository")
 	if user != "" && password != "" {
 		ctx, cancel := context.WithCancel(context.Background())
-		gCancelCommands = append(gCancelCommands, cancel)
-		gClient.RegistryLogin(ctx, user, password, registry)
+		gCancelCommands.Append(cancel)
+		getDockerClient().RegistryLogin(ctx, user, password, registry)
 	}
 	// print status
 	fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
 	// create new webhook
-	githubHook := New(registry, repository, &gCancelCommands, notify, &github.Config{Secret: secret})
+	githubHook := New(registry, repository, gCancelCommands, notify, &github.Config{Secret: secret})
 	// register push event handler
 	githubHook.RegisterPushEvent()
 	// register create event handler
@@ -268,8 +275,11 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 
 func dockerInfo(c *cli.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
-	gCancelCommands = append(gCancelCommands, cancel)
-	info, err := gClient.Info(ctx)
+	fmt.Println("Before Append")
+	gCancelCommands.Append(cancel)
+	fmt.Println("After Append")
+	info, err := getDockerClient().Info(ctx)
+	fmt.Println("After Info")
 	if err != nil {
 		log.Error(err)
 	}

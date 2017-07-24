@@ -8,6 +8,7 @@ ignore:
 - sort
 import:
 - package: github.com/Sirupsen/logrus
+  version: ~1.0.2
 - package: github.com/docker/docker
   subpackages:
   - api/types
@@ -17,3 +18,9 @@ import:
 - package: gopkg.in/go-playground/webhooks.v3
   subpackages:
   - github
+- package: github.com/stretchr/testify
+  version: ~1.1.4
+  subpackages:
+  - mock
+- package: github.com/pborman/uuid
+  version: ~1.1.0

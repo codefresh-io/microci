@@ -17,11 +17,11 @@ type GitHubHook struct {
 	Registry       string
 	Repository     string
 	Notify         BuildNotify
-	CancelCommands *[]interface{}
+	CancelCommands *ConcurrentSlice
 }
 
 // New creates and returns a GitHubHook instance
-func New(registry, repository string, commands *[]interface{}, notify BuildNotify, config *github.Config) *GitHubHook {
+func New(registry, repository string, commands *ConcurrentSlice, notify BuildNotify, config *github.Config) *GitHubHook {
 	return &GitHubHook{
 		webhook:        github.New(config),
 		CancelCommands: commands,
@@ -64,8 +64,9 @@ func (hook GitHubHook) handlePushEvent(payload interface{}, header webhooks.Head
 
 	// do build
 	ctx, cancel := context.WithCancel(context.Background())
-	*hook.CancelCommands = append(*hook.CancelCommands, cancel)
-	go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, pl.HeadCommit.ID, hook.Registry, hook.Repository, hook.Notify)
+	hook.CancelCommands.Append(cancel)
+	client := getDockerClient()
+	go client.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, pl.HeadCommit.ID, hook.Registry, hook.Repository, hook.Notify)
 }
 
 // handleCreateEvent handles GitHub create events
@@ -84,7 +85,8 @@ func (hook GitHubHook) handleCreateEvent(payload interface{}, header webhooks.He
 		cloneURL := pl.Repository.CloneURL
 		// build
 		ctx, cancel := context.WithCancel(context.Background())
-		*hook.CancelCommands = append(*hook.CancelCommands, cancel)
-		go gClient.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, ref, hook.Registry, hook.Repository, hook.Notify)
+		hook.CancelCommands.Append(cancel)
+		client := getDockerClient()
+		go client.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, ref, hook.Registry, hook.Repository, hook.Notify)
 	}
 }

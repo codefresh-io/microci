@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"net/http"
 	"os"
@@ -9,8 +10,35 @@ import (
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/mock"
 	"github.com/urfave/cli"
 )
+
+type DockerMock struct {
+	mock.Mock
+}
+
+func (m *DockerMock) Info(ctx context.Context) (string, error) {
+	args := m.Called(ctx)
+	return args.String(0), args.Error(1)
+}
+
+func (m *DockerMock) RegistryLogin(ctx context.Context, user, password, registry string) error {
+	args := m.Called(ctx, user, password, registry)
+	return args.Error(0)
+}
+func (m *DockerMock) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag, registry, repository string, notify BuildNotify) error {
+	args := m.Called(ctx, cloneURL, ref, name, fullname, tag, registry, repository, notify)
+	return args.Error(0)
+}
+
+var dockerMock *DockerMock
+var getMockDockerClient = func() DockerClient {
+	if dockerMock == nil {
+		dockerMock = &DockerMock{}
+	}
+	return dockerMock
+}
 
 //---- TESTS
 
@@ -55,7 +83,7 @@ func Test_before(t *testing.T) {
 
 func Test_handleSignals(t *testing.T) {
 	_, cancel := context.WithCancel(context.Background())
-	gCancelCommands = append(gCancelCommands, cancel)
+	gCancelCommands.Append(cancel)
 	sigs := make(chan os.Signal, 1)
 	type args struct {
 		sigs         chan os.Signal
@@ -64,23 +92,16 @@ func Test_handleSignals(t *testing.T) {
 	tests := []struct {
 		name string
 		args args
+		sig  os.Signal
 	}{
-		{"SIGTERM", args{sigs, false}},
-		{"SIGKILL", args{sigs, false}},
-		{"UNKNOWN", args{sigs, false}},
+		{"SIGTERM", args{sigs, false}, syscall.SIGTERM},
+		{"SIGKILL", args{sigs, false}, syscall.SIGKILL},
+		{"UNKNOWN", args{sigs, false}, syscall.SIGUSR1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handleSignals(tt.args.sigs, tt.args.exitOnSignal)
-			if tt.name == "SIGTERM" {
-				// send SIGTERM signal
-				sigs <- syscall.SIGTERM
-			} else if tt.name == "SIGKILL" {
-				// send SIGKILL signal
-				sigs <- syscall.SIGKILL
-			} else {
-				sigs <- syscall.SIGUSR1
-			}
+			sigs <- tt.sig
 			// wait a while to handle signal
 			time.Sleep(time.Millisecond)
 		})
@@ -104,24 +125,6 @@ func Test_webhookServer(t *testing.T) {
 	}
 }
 
-func Test_reportHandler(t *testing.T) {
-	type args struct {
-		w http.ResponseWriter
-		r *http.Request
-	}
-	tests := []struct {
-		name string
-		args args
-	}{
-	// TODO: Add test cases.
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			reportHandler(tt.args.w, tt.args.r)
-		})
-	}
-}
-
 func Test_statusHandler(t *testing.T) {
 	type args struct {
 		w http.ResponseWriter
@@ -141,18 +144,26 @@ func Test_statusHandler(t *testing.T) {
 }
 
 func Test_dockerInfo(t *testing.T) {
+	keepGetDockerClient := getDockerClient
+	defer func() { getDockerClient = keepGetDockerClient }()
+	getDockerClient = getMockDockerClient
 	type args struct {
 		c *cli.Context
 	}
 	tests := []struct {
-		name string
-		args args
+		name       string
+		args       args
+		mockClient *DockerMock
+		err        error
 	}{
-	// TODO: Add test cases.
+		{"infoNoError", args{nil}, getDockerClient().(*DockerMock), nil},
+		{"infoWithError", args{nil}, getDockerClient().(*DockerMock), errors.New("Test Error")},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			tt.mockClient.On("Info", mock.Anything).Return("Test Info", tt.err)
 			dockerInfo(tt.args.c)
+			tt.mockClient.AssertExpectations(t)
 		})
 	}
 }
