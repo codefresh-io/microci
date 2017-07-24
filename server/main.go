@@ -195,12 +195,10 @@ func handleSignals(sigs chan os.Signal, exitOnSignal bool) {
 	}()
 }
 
-// Serve webhooks
-func webhookServer(c *cli.Context) {
+// handle webhook - testable function
+func handleWebhook(c *cli.Context) http.Handler {
 	// get GitHub secret
 	secret := c.String("secret")
-	// get port
-	port := c.Int("port")
 	// get slack token and channel
 	slackToken := c.String("slack-token")
 	slackChannel := c.String("slack-channel")
@@ -222,8 +220,7 @@ func webhookServer(c *cli.Context) {
 		gCancelCommands.Append(cancel)
 		getDockerClient().RegistryLogin(ctx, user, password, registry)
 	}
-	// print status
-	fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
+
 	// create new webhook
 	githubHook := New(registry, repository, gCancelCommands, notify, &github.Config{Secret: secret})
 	// register push event handler
@@ -250,9 +247,20 @@ func webhookServer(c *cli.Context) {
 	srv.HandleFunc("/", statusHandler)
 	srv.HandleFunc("/microci/", statusHandler)
 
-	err := http.ListenAndServe(":"+strconv.Itoa(port), srv)
+	return srv
+}
+
+// Serve webhooks
+func webhookServer(c *cli.Context) {
+	// get port
+	port := c.Int("port")
+	// run http server and handle webhook
+	err := http.ListenAndServe(":"+strconv.Itoa(port), handleWebhook(c))
 	if err != nil {
 		log.Error(err)
+	} else {
+		// print status
+		fmt.Printf("Listening for GitHub hooks on port: %d ...\n", port)
 	}
 }
 
@@ -275,11 +283,8 @@ func statusHandler(w http.ResponseWriter, r *http.Request) {
 
 func dockerInfo(c *cli.Context) {
 	ctx, cancel := context.WithCancel(context.Background())
-	fmt.Println("Before Append")
 	gCancelCommands.Append(cancel)
-	fmt.Println("After Append")
 	info, err := getDockerClient().Info(ctx)
-	fmt.Println("After Info")
 	if err != nil {
 		log.Error(err)
 	}

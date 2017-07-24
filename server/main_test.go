@@ -4,12 +4,16 @@ import (
 	"context"
 	"errors"
 	"flag"
+	"io/ioutil"
 	"net/http"
+	"net/http/httptest"
 	"os"
+	"strings"
 	"syscall"
 	"testing"
 	"time"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 	"github.com/urfave/cli"
 )
@@ -108,7 +112,20 @@ func Test_handleSignals(t *testing.T) {
 	}
 }
 
-func Test_webhookServer(t *testing.T) {
+func Test_handleWebhook(t *testing.T) {
+	// simple set of flags
+	set := flag.NewFlagSet("test", 0)
+	set.String("secret", "test-secret", "doc")
+	set.String("registry", "test-registry", "doc")
+	set.String("repository", "test-repository", "doc")
+	// same as above, plus credentials
+	setLogin := flag.NewFlagSet("test", 0)
+	setLogin.String("secret", "test-secret", "doc")
+	setLogin.String("user", "test-user", "doc")
+	setLogin.String("password", "test-password", "doc")
+	setLogin.String("registry", "test-registry", "doc")
+	setLogin.String("repository", "test-repository", "doc")
+
 	type args struct {
 		c *cli.Context
 	}
@@ -116,29 +133,45 @@ func Test_webhookServer(t *testing.T) {
 		name string
 		args args
 	}{
-	// TODO: Add test cases.
+		{"testNoLogin", args{cli.NewContext(nil, set, nil)}},
+		{"testRegistryLogin", args{cli.NewContext(nil, setLogin, nil)}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			webhookServer(tt.args.c)
+			h := handleWebhook(tt.args.c)
+			server := httptest.NewServer(h)
+			defer server.Close()
+			// invoke method
+			resp, err := http.Get(server.URL)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if resp.StatusCode != 200 {
+				t.Fatalf("Received non-200 response: %d\n", resp.StatusCode)
+			}
 		})
 	}
 }
 
 func Test_statusHandler(t *testing.T) {
 	type args struct {
-		w http.ResponseWriter
+		w *httptest.ResponseRecorder
 		r *http.Request
 	}
 	tests := []struct {
-		name string
-		args args
+		name     string
+		args     args
+		expected string
 	}{
-	// TODO: Add test cases.
+		{"noDebug", args{httptest.NewRecorder(), httptest.NewRequest("GET", "http://test/status", nil)}, ASCIILogo},
+		{"withDebug", args{httptest.NewRecorder(), httptest.NewRequest("GET", "http://test/status?debug=true", nil)}, "Debug request:"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			statusHandler(tt.args.w, tt.args.r)
+			resp := tt.args.w.Result()
+			body, _ := ioutil.ReadAll(resp.Body)
+			assert.True(t, strings.Contains(string(body), tt.expected))
 		})
 	}
 }
