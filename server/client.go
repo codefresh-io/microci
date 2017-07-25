@@ -1,16 +1,16 @@
 package main
 
 import (
-	"context"
 	"encoding/base64"
 	"encoding/json"
 	"io"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
-
 	"github.com/docker/docker/api/types"
+	"github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/client"
+	"golang.org/x/net/context"
 )
 
 // DockerClient interface
@@ -44,8 +44,16 @@ func NewClient() DockerClient {
 	return &dockerAPI{apiClient: apiClient}
 }
 
+// DockerClientAPI - a subset of Docker API used by MicroCI; wrap it with interface for testing/mocking
+type DockerClientAPI interface {
+	Info(ctx context.Context) (types.Info, error)
+	RegistryLogin(ctx context.Context, auth types.AuthConfig) (registry.AuthenticateOKBody, error)
+	ImagePush(ctx context.Context, ref string, options types.ImagePushOptions) (io.ReadCloser, error)
+	ImageBuild(ctx context.Context, buildContext io.Reader, options types.ImageBuildOptions) (types.ImageBuildResponse, error)
+}
+
 type dockerAPI struct {
-	apiClient  *client.Client
+	apiClient  DockerClientAPI
 	authBase64 string
 }
 

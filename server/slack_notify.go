@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -12,6 +11,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/nlopes/slack"
+	"golang.org/x/net/context"
 )
 
 // SlackNotify Slack notify interface
