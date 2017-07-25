@@ -1,5 +1,11 @@
 # MicroCI
 
+#### Build
+[![Codefresh build status]( https://g.codefresh.io/api/badges/build?repoOwner=codefresh-io&repoName=microci&branch=master&pipelineName=microci&accountName=codefresh-inc&type=cf-1)](https://g.codefresh.io/repositories/codefresh-io/microci/builds?filter=trigger:build;branch:master;service:59412ded7cf47f0001446054~microci) [![Go Report Card](https://goreportcard.com/badge/github.com/codefresh-io/microci)](https://goreportcard.com/report/github.com/codefresh-io/microci) [![codecov](https://codecov.io/gh/codefresh-io/microci/branch/master/graph/badge.svg)](https://codecov.io/gh/codefresh-io/microci) 
+#### Image
+[![](https://images.microbadger.com/badges/image/codefreshio/microci.svg)](http://microbadger.com/images/codefreshio/microci) [![](https://images.microbadger.com/badges/commit/codefreshio/microci.svg)](https://microbadger.com/images/codefreshio/microci "Get your own commit badge on microbadger.com") [![Docker badge](https://img.shields.io/docker/pulls/codefreshio/microci.svg)](https://hub.docker.com/r/codefreshio/microci/) 
+
+
 ```
                    _ ___ 
   |\/| o  _ ._ _  /   |  
