@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"io"
 	"strings"
+	"time"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/docker/docker/api/types"
@@ -16,21 +17,14 @@ import (
 // DockerClient interface
 type DockerClient interface {
 	RegistryLogin(ctx context.Context, user, password, registry string) error
-	BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag, registry, repository string, notify BuildNotify) error
+	BuildPushImage(ctx context.Context, cloneURL, ref, repoName, owner, tag, registry, repository string, notify BuildNotify, statusNotify GitStatusNotify) error
 	Info(ctx context.Context) (string, error)
 }
 
 // BuildNotify interface
 type BuildNotify interface {
-	SendBuildReport(ctx context.Context, readCloser io.ReadCloser, target BuildTarget)
+	SendBuildReport(ctx context.Context, readCloser io.ReadCloser, report BuildReport)
 	SendPushReport(ctx context.Context, readCloser io.ReadCloser, image string)
-}
-
-// BuildTarget build target details
-type BuildTarget struct {
-	Name       string
-	Tag        string
-	GitContext string
 }
 
 // NewClient returns a new Client instance which can be used to interact with
@@ -75,7 +69,7 @@ func (api *dockerAPI) RegistryLogin(ctx context.Context, user, password, registr
 	return nil
 }
 
-func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag, registry, repository string, notify BuildNotify) error {
+func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, repoName, owner, tag, registry, repository string, notify BuildNotify, statusNotify GitStatusNotify) error {
 	// set build options
 	var options types.ImageBuildOptions
 	options.RemoteContext = cloneURL + "#" + ref
@@ -86,9 +80,9 @@ func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, f
 		imageName += registry + "/"
 	}
 	if repository != "" {
-		imageName += repository + "/" + name
+		imageName += repository + "/" + repoName
 	} else {
-		imageName += fullname
+		imageName += owner + "/" + repoName
 	}
 	// get branch fro ref (if branch) or tag
 	refs := strings.Split(ref, "/")
@@ -107,13 +101,17 @@ func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, name, f
 		return err
 	}
 	// set build target
-	var buildTarget BuildTarget
-	buildTarget.GitContext = options.RemoteContext
-	buildTarget.Name = name
-	buildTarget.Tag = tag
+	var buildReport BuildReport
+	buildReport.BuildContext = options.RemoteContext
+	buildReport.RepoName = repoName
+	buildReport.Owner = owner
+	buildReport.ImageName = imageName
+	buildReport.Tag = tag
+	buildReport.Start = time.Now()
+	buildReport.StatusNotify = statusNotify
 
 	// send build output and status
-	notify.SendBuildReport(ctx, buildResponse.Body, buildTarget)
+	notify.SendBuildReport(ctx, buildResponse.Body, buildReport)
 
 	// push new image, if registry authBase64 is not nil (credentials specified)
 	if api.authBase64 != "" {

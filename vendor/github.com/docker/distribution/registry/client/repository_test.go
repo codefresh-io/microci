@@ -16,14 +16,15 @@ import (
 
 	"github.com/docker/distribution"
 	"github.com/docker/distribution/context"
-	"github.com/docker/distribution/digest"
 	"github.com/docker/distribution/manifest"
 	"github.com/docker/distribution/manifest/schema1"
 	"github.com/docker/distribution/reference"
 	"github.com/docker/distribution/registry/api/errcode"
+	"github.com/docker/distribution/registry/api/v2"
 	"github.com/docker/distribution/testutil"
 	"github.com/docker/distribution/uuid"
 	"github.com/docker/libtrust"
+	"github.com/opencontainers/go-digest"
 )
 
 func testServer(rrm testutil.RequestResponseMap) (string, func()) {
@@ -99,7 +100,7 @@ func addTestCatalog(route string, content []byte, link string, m *testutil.Reque
 func TestBlobDelete(t *testing.T) {
 	dgst, _ := newRandomBlob(1024)
 	var m testutil.RequestResponseMap
-	repo, _ := reference.ParseNamed("test.example.com/repo1")
+	repo, _ := reference.WithName("test.example.com/repo1")
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
 			Method: "DELETE",
@@ -138,7 +139,7 @@ func TestBlobFetch(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	repo, _ := reference.ParseNamed("test.example.com/repo1")
+	repo, _ := reference.WithName("test.example.com/repo1")
 	r, err := NewRepository(ctx, repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -159,7 +160,7 @@ func TestBlobFetch(t *testing.T) {
 func TestBlobExistsNoContentLength(t *testing.T) {
 	var m testutil.RequestResponseMap
 
-	repo, _ := reference.ParseNamed("biff")
+	repo, _ := reference.WithName("biff")
 	dgst, content := newRandomBlob(1024)
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
@@ -218,7 +219,7 @@ func TestBlobExists(t *testing.T) {
 	defer c()
 
 	ctx := context.Background()
-	repo, _ := reference.ParseNamed("test.example.com/repo1")
+	repo, _ := reference.WithName("test.example.com/repo1")
 	r, err := NewRepository(ctx, repo, e, nil)
 	if err != nil {
 		t.Fatal(err)
@@ -250,7 +251,7 @@ func TestBlobUploadChunked(t *testing.T) {
 		b1[512:513],
 		b1[513:1024],
 	}
-	repo, _ := reference.ParseNamed("test.example.com/uploadrepo")
+	repo, _ := reference.WithName("test.example.com/uploadrepo")
 	uuids := []string{uuid.Generate().String()}
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
@@ -365,7 +366,7 @@ func TestBlobUploadChunked(t *testing.T) {
 func TestBlobUploadMonolithic(t *testing.T) {
 	dgst, b1 := newRandomBlob(1024)
 	var m testutil.RequestResponseMap
-	repo, _ := reference.ParseNamed("test.example.com/uploadrepo")
+	repo, _ := reference.WithName("test.example.com/uploadrepo")
 	uploadID := uuid.Generate().String()
 	m = append(m, testutil.RequestResponseMapping{
 		Request: testutil.Request{
@@ -473,9 +474,9 @@ func TestBlobUploadMonolithic(t *testing.T) {
 func TestBlobMount(t *testing.T) {
 	dgst, content := newRandomBlob(1024)
 	var m testutil.RequestResponseMap
-	repo, _ := reference.ParseNamed("test.example.com/uploadrepo")
+	repo, _ := reference.WithName("test.example.com/uploadrepo")
 
-	sourceRepo, _ := reference.ParseNamed("test.example.com/sourcerepo")
+	sourceRepo, _ := reference.WithName("test.example.com/sourcerepo")
 	canonicalRef, _ := reference.WithDigest(sourceRepo, dgst)
 
 	m = append(m, testutil.RequestResponseMapping{
@@ -677,7 +678,7 @@ func checkEqualManifest(m1, m2 *schema1.SignedManifest) error {
 
 func TestV1ManifestFetch(t *testing.T) {
 	ctx := context.Background()
-	repo, _ := reference.ParseNamed("test.example.com/repo")
+	repo, _ := reference.WithName("test.example.com/repo")
 	m1, dgst, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
 	_, pl, err := m1.Payload()
@@ -754,7 +755,7 @@ func TestV1ManifestFetch(t *testing.T) {
 }
 
 func TestManifestFetchWithEtag(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/by/tag")
+	repo, _ := reference.WithName("test.example.com/repo/by/tag")
 	_, d1, p1 := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
 	addTestManifestWithEtag(repo, "latest", p1, &m, d1.String())
@@ -784,7 +785,7 @@ func TestManifestFetchWithEtag(t *testing.T) {
 }
 
 func TestManifestDelete(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/delete")
+	repo, _ := reference.WithName("test.example.com/repo/delete")
 	_, dgst1, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	_, dgst2, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
@@ -824,7 +825,7 @@ func TestManifestDelete(t *testing.T) {
 }
 
 func TestManifestPut(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/delete")
+	repo, _ := reference.WithName("test.example.com/repo/delete")
 	m1, dgst, _ := newRandomSchemaV1Manifest(repo, "other", 6)
 
 	_, payload, err := m1.Payload()
@@ -889,7 +890,7 @@ func TestManifestPut(t *testing.T) {
 }
 
 func TestManifestTags(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo/tags/list")
+	repo, _ := reference.WithName("test.example.com/repo/tags/list")
 	tagsList := []byte(strings.TrimSpace(`
 {
 	"name": "test.example.com/repo/tags/list",
@@ -950,11 +951,54 @@ func TestManifestTags(t *testing.T) {
 	// TODO(dmcgowan): Check for error cases
 }
 
+func TestObtainsErrorForMissingTag(t *testing.T) {
+	repo, _ := reference.WithName("test.example.com/repo")
+
+	var m testutil.RequestResponseMap
+	var errors errcode.Errors
+	errors = append(errors, v2.ErrorCodeManifestUnknown.WithDetail("unknown manifest"))
+	errBytes, err := json.Marshal(errors)
+	if err != nil {
+		t.Fatal(err)
+	}
+	m = append(m, testutil.RequestResponseMapping{
+		Request: testutil.Request{
+			Method: "GET",
+			Route:  "/v2/" + repo.Name() + "/manifests/1.0.0",
+		},
+		Response: testutil.Response{
+			StatusCode: http.StatusNotFound,
+			Body:       errBytes,
+			Headers: http.Header(map[string][]string{
+				"Content-Type": {"application/json; charset=utf-8"},
+			}),
+		},
+	})
+	e, c := testServer(m)
+	defer c()
+
+	ctx := context.Background()
+	r, err := NewRepository(ctx, repo, e, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	tagService := r.Tags(ctx)
+
+	_, err = tagService.Get(ctx, "1.0.0")
+	if err == nil {
+		t.Fatalf("Expected an error")
+	}
+	if !strings.Contains(err.Error(), "manifest unknown") {
+		t.Fatalf("Expected unknown manifest error message")
+	}
+}
+
 func TestManifestTagsPaginated(t *testing.T) {
 	s := httptest.NewServer(http.NotFoundHandler())
 	defer s.Close()
 
-	repo, _ := reference.ParseNamed("test.example.com/repo/tags/list")
+	repo, _ := reference.WithName("test.example.com/repo/tags/list")
 	tagsList := []string{"tag1", "tag2", "funtag"}
 	var m testutil.RequestResponseMap
 	for i := 0; i < 3; i++ {
@@ -1023,7 +1067,7 @@ func TestManifestTagsPaginated(t *testing.T) {
 }
 
 func TestManifestUnauthorized(t *testing.T) {
-	repo, _ := reference.ParseNamed("test.example.com/repo")
+	repo, _ := reference.WithName("test.example.com/repo")
 	_, dgst, _ := newRandomSchemaV1Manifest(repo, "latest", 6)
 	var m testutil.RequestResponseMap
 

@@ -143,15 +143,16 @@ func Test_dockerAPI_BuildPushImage(t *testing.T) {
 		authBase64 string
 	}
 	type args struct {
-		ctx        context.Context
-		cloneURL   string
-		ref        string
-		name       string
-		fullname   string
-		tag        string
-		registry   string
-		repository string
-		notify     BuildNotify
+		ctx          context.Context
+		cloneURL     string
+		ref          string
+		name         string
+		fullname     string
+		tag          string
+		registry     string
+		repository   string
+		notify       BuildNotify
+		statusNotify GitStatusNotify
 	}
 	tests := []struct {
 		name    string
@@ -167,7 +168,7 @@ func Test_dockerAPI_BuildPushImage(t *testing.T) {
 				apiClient:  tt.fields.apiClient,
 				authBase64: tt.fields.authBase64,
 			}
-			if err := api.BuildPushImage(tt.args.ctx, tt.args.cloneURL, tt.args.ref, tt.args.name, tt.args.fullname, tt.args.tag, tt.args.registry, tt.args.repository, tt.args.notify); (err != nil) != tt.wantErr {
+			if err := api.BuildPushImage(tt.args.ctx, tt.args.cloneURL, tt.args.ref, tt.args.name, tt.args.fullname, tt.args.tag, tt.args.registry, tt.args.repository, tt.args.notify, tt.args.statusNotify); (err != nil) != tt.wantErr {
 				t.Errorf("dockerAPI.BuildPushImage() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

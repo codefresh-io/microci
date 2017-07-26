@@ -31,7 +31,7 @@ func (m *DockerMock) RegistryLogin(ctx context.Context, user, password, registry
 	args := m.Called(ctx, user, password, registry)
 	return args.Error(0)
 }
-func (m *DockerMock) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag, registry, repository string, notify BuildNotify) error {
+func (m *DockerMock) BuildPushImage(ctx context.Context, cloneURL, ref, name, fullname, tag, registry, repository string, notify BuildNotify, statusNotify GitStatusNotify) error {
 	args := m.Called(ctx, cloneURL, ref, name, fullname, tag, registry, repository, notify)
 	return args.Error(0)
 }

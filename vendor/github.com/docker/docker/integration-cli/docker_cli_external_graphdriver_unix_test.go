@@ -53,7 +53,7 @@ type graphEventsCounter struct {
 
 func (s *DockerExternalGraphdriverSuite) SetUpTest(c *check.C) {
 	s.d = daemon.New(c, dockerBinary, dockerdBinary, daemon.Config{
-		Experimental: experimentalDaemon,
+		Experimental: testEnv.ExperimentalDaemon(),
 	})
 }
 
@@ -111,7 +111,7 @@ func (s *DockerExternalGraphdriverSuite) setUpPlugin(c *check.C, name string, ex
 	}
 
 	respond := func(w http.ResponseWriter, data interface{}) {
-		w.Header().Set("Content-Type", "appplication/vnd.docker.plugins.v1+json")
+		w.Header().Set("Content-Type", "application/vnd.docker.plugins.v1+json")
 		switch t := data.(type) {
 		case error:
 			fmt.Fprintln(w, fmt.Sprintf(`{"Err": %q}`, t.Error()))

@@ -22,18 +22,14 @@ type SlackNotify struct {
 }
 
 // SendBuildReport send build output to slack channel
-func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, target BuildTarget) {
+func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, buildReport BuildReport) {
 	defer r.Close()
 
-	// create build report
-	var buildReport BuildReport
-	buildReport.BuildTarget = target
 	// format build report message
 	var output []string
-	buildReport.Start = time.Now()
 	// regexp to decide on build status: FAILED by default
 	re := regexp.MustCompile("Successfully built ([0-9a-f]{12})")
-	buildReport.Status = "FAILED"
+	buildReport.SetStatus(StatusRunning)
 	// prepare output
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -46,11 +42,15 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 		output = append(output, line.Stream)
 		status := re.FindString(line.Stream)
 		if status != "" {
-			buildReport.Status = "PASSED"
+			buildReport.SetStatus(StatusPassed)
 		}
+	}
+	if buildReport.status != StatusPassed {
+		buildReport.SetStatus(StatusFailed)
 	}
 	if err := scanner.Err(); err != nil {
 		log.Error(err)
+		buildReport.SetStatus(StatusError)
 	}
 	buildReport.Duration = time.Since(buildReport.Start)
 
@@ -71,7 +71,7 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 		Fields: []slack.AttachmentField{
 			slack.AttachmentField{
 				Title: "Status",
-				Value: buildReport.Status,
+				Value: buildReport.GetStatus(),
 			},
 			slack.AttachmentField{
 				Title: "Duration",
@@ -79,7 +79,7 @@ func (s SlackNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, targe
 			},
 			slack.AttachmentField{
 				Title: "Git Context",
-				Value: target.GitContext,
+				Value: buildReport.BuildContext,
 			},
 		},
 	}

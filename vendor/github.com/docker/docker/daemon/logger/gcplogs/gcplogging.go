@@ -12,18 +12,20 @@ import (
 	"cloud.google.com/go/logging"
 	"github.com/Sirupsen/logrus"
 	"golang.org/x/net/context"
+	mrpb "google.golang.org/genproto/googleapis/api/monitoredres"
 )
 
 const (
 	name = "gcplogs"
 
-	projectOptKey = "gcp-project"
-	logLabelsKey  = "labels"
-	logEnvKey     = "env"
-	logCmdKey     = "gcp-log-cmd"
-	logZoneKey    = "gcp-meta-zone"
-	logNameKey    = "gcp-meta-name"
-	logIDKey      = "gcp-meta-id"
+	projectOptKey  = "gcp-project"
+	logLabelsKey   = "labels"
+	logEnvKey      = "env"
+	logEnvRegexKey = "env-regex"
+	logCmdKey      = "gcp-log-cmd"
+	logZoneKey     = "gcp-meta-zone"
+	logNameKey     = "gcp-meta-name"
+	logIDKey       = "gcp-meta-id"
 )
 
 var (
@@ -59,7 +61,7 @@ type gcplogs struct {
 type dockerLogEntry struct {
 	Instance  *instanceInfo  `json:"instance,omitempty"`
 	Container *containerInfo `json:"container,omitempty"`
-	Data      string         `json:"data,omitempty"`
+	Message   string         `json:"message,omitempty"`
 }
 
 type instanceInfo struct {
@@ -87,7 +89,7 @@ func initGCP() {
 			// These will fail on instances if the metadata service is
 			// down or the client is compiled with an API version that
 			// has been removed. Since these are not vital, let's ignore
-			// them and make their fields in the dockeLogEntry ,omitempty
+			// them and make their fields in the dockerLogEntry ,omitempty
 			projectID, _ = metadata.ProjectID()
 			zone, _ = metadata.Zone()
 			instanceName, _ = metadata.InstanceName()
@@ -111,7 +113,7 @@ func New(info logger.Info) (logger.Logger, error) {
 		project = projectID
 	}
 	if project == "" {
-		return nil, fmt.Errorf("No project was specified and couldn't read project from the meatadata server. Please specify a project")
+		return nil, fmt.Errorf("No project was specified and couldn't read project from the metadata server. Please specify a project")
 	}
 
 	// Issue #29344: gcplogs segfaults (static binary)
@@ -127,10 +129,43 @@ func New(info logger.Info) (logger.Logger, error) {
 	if err != nil {
 		return nil, err
 	}
-	lg := c.Logger("gcplogs-docker-driver")
+	var instanceResource *instanceInfo
+	if onGCE {
+		instanceResource = &instanceInfo{
+			Zone: zone,
+			Name: instanceName,
+			ID:   instanceID,
+		}
+	} else if info.Config[logZoneKey] != "" || info.Config[logNameKey] != "" || info.Config[logIDKey] != "" {
+		instanceResource = &instanceInfo{
+			Zone: info.Config[logZoneKey],
+			Name: info.Config[logNameKey],
+			ID:   info.Config[logIDKey],
+		}
+	}
+
+	options := []logging.LoggerOption{}
+	if instanceResource != nil {
+		vmMrpb := logging.CommonResource(
+			&mrpb.MonitoredResource{
+				Type: "gce_instance",
+				Labels: map[string]string{
+					"instance_id": instanceResource.ID,
+					"zone":        instanceResource.Zone,
+				},
+			},
+		)
+		options = []logging.LoggerOption{vmMrpb}
+	}
+	lg := c.Logger("gcplogs-docker-driver", options...)
 
 	if err := c.Ping(context.Background()); err != nil {
 		return nil, fmt.Errorf("unable to connect or authenticate with Google Cloud Logging: %v", err)
+	}
+
+	extraAttributes, err := info.ExtraAttributes(nil)
+	if err != nil {
+		return nil, err
 	}
 
 	l := &gcplogs{
@@ -141,7 +176,7 @@ func New(info logger.Info) (logger.Logger, error) {
 			ImageName: info.ContainerImageName,
 			ImageID:   info.ContainerImageID,
 			Created:   info.ContainerCreated,
-			Metadata:  info.ExtraAttributes(nil),
+			Metadata:  extraAttributes,
 		},
 	}
 
@@ -149,18 +184,8 @@ func New(info logger.Info) (logger.Logger, error) {
 		l.container.Command = info.Command()
 	}
 
-	if onGCE {
-		l.instance = &instanceInfo{
-			Zone: zone,
-			Name: instanceName,
-			ID:   instanceID,
-		}
-	} else if info.Config[logZoneKey] != "" || info.Config[logNameKey] != "" || info.Config[logIDKey] != "" {
-		l.instance = &instanceInfo{
-			Zone: info.Config[logZoneKey],
-			Name: info.Config[logNameKey],
-			ID:   info.Config[logIDKey],
-		}
+	if instanceResource != nil {
+		l.instance = instanceResource
 	}
 
 	// The logger "overflows" at a rate of 10,000 logs per second and this
@@ -185,7 +210,7 @@ func New(info logger.Info) (logger.Logger, error) {
 func ValidateLogOpts(cfg map[string]string) error {
 	for k := range cfg {
 		switch k {
-		case projectOptKey, logLabelsKey, logEnvKey, logCmdKey, logZoneKey, logNameKey, logIDKey:
+		case projectOptKey, logLabelsKey, logEnvKey, logEnvRegexKey, logCmdKey, logZoneKey, logNameKey, logIDKey:
 		default:
 			return fmt.Errorf("%q is not a valid option for the gcplogs driver", k)
 		}
@@ -194,12 +219,16 @@ func ValidateLogOpts(cfg map[string]string) error {
 }
 
 func (l *gcplogs) Log(m *logger.Message) error {
+	message := string(m.Line)
+	ts := m.Timestamp
+	logger.PutMessage(m)
+
 	l.logger.Log(logging.Entry{
-		Timestamp: m.Timestamp,
+		Timestamp: ts,
 		Payload: &dockerLogEntry{
 			Instance:  l.instance,
 			Container: l.container,
-			Data:      string(m.Line),
+			Message:   message,
 		},
 	})
 	return nil

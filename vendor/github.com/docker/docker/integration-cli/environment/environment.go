@@ -4,16 +4,30 @@ import (
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
 
-	"golang.org/x/net/context"
-
 	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
 	"github.com/docker/docker/client"
+	"github.com/docker/docker/opts"
+	"golang.org/x/net/context"
 )
+
+var (
+	// DefaultClientBinary is the name of the docker binary
+	DefaultClientBinary = os.Getenv("TEST_CLIENT_BINARY")
+)
+
+func init() {
+	if DefaultClientBinary == "" {
+		// TODO: to be removed once we no longer depend on the docker cli for integration tests
+		//panic("TEST_CLIENT_BINARY must be set")
+		DefaultClientBinary = "docker"
+	}
+}
 
 // Execution holds informations about the test execution environment.
 type Execution struct {
@@ -32,7 +46,10 @@ type Execution struct {
 	containerStoragePath string
 	// baseImage is the name of the base image for testing
 	// Environment variable WINDOWS_BASE_IMAGE can override this
-	baseImage string
+	baseImage    string
+	dockerBinary string
+
+	protectedElements protectedElements
 }
 
 // New creates a new Execution struct
@@ -89,6 +106,12 @@ func New() (*Execution, error) {
 			daemonPid = int(p)
 		}
 	}
+
+	dockerBinary, err := exec.LookPath(DefaultClientBinary)
+	if err != nil {
+		return nil, err
+	}
+
 	return &Execution{
 		localDaemon:          localDaemon,
 		daemonPlatform:       daemonPlatform,
@@ -101,6 +124,10 @@ func New() (*Execution, error) {
 		daemonPid:            daemonPid,
 		experimentalDaemon:   info.ExperimentalBuild,
 		baseImage:            baseImage,
+		dockerBinary:         dockerBinary,
+		protectedElements: protectedElements{
+			images: map[string]struct{}{},
+		},
 	}, nil
 }
 func getDaemonDockerInfo() (types.Info, error) {
@@ -185,4 +212,18 @@ func (e *Execution) DaemonKernelVersionNumeric() int {
 	}
 	v, _ := strconv.Atoi(strings.Split(e.daemonKernelVersion, " ")[1])
 	return v
+}
+
+// DockerBinary returns the docker binary for this testing environment
+func (e *Execution) DockerBinary() string {
+	return e.dockerBinary
+}
+
+// DaemonHost return the daemon host string for this test execution
+func DaemonHost() string {
+	daemonURLStr := "unix://" + opts.DefaultUnixSocket
+	if daemonHostVar := os.Getenv("DOCKER_HOST"); daemonHostVar != "" {
+		daemonURLStr = daemonHostVar
+	}
+	return daemonURLStr
 }

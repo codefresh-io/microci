@@ -12,11 +12,11 @@ import (
 	"testing"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/docker/distribution/reference"
 	"github.com/docker/docker/api/types"
 	registrytypes "github.com/docker/docker/api/types/registry"
 	"github.com/docker/docker/pkg/archive"
 	"github.com/docker/docker/pkg/stringid"
-	"github.com/docker/docker/reference"
 	"github.com/docker/docker/registry"
 	"golang.org/x/net/context"
 )
@@ -61,9 +61,9 @@ func testTokenPassThru(t *testing.T, ts *httptest.Server) {
 		TrimHostname: false,
 		TLSConfig:    nil,
 	}
-	n, _ := reference.ParseNamed("testremotename")
+	n, _ := reference.ParseNormalizedNamed("testremotename")
 	repoInfo := &registry.RepositoryInfo{
-		Named: n,
+		Name: n,
 		Index: &registrytypes.IndexInfo{
 			Name:     "testrepo",
 			Mirrors:  nil,
@@ -152,7 +152,7 @@ func testDirectory(templateDir string) (dir string, err error) {
 		return
 	}
 	if templateDir != "" {
-		if err = archive.CopyWithTar(templateDir, dir); err != nil {
+		if err = archive.NewDefaultArchiver().CopyWithTar(templateDir, dir); err != nil {
 			return
 		}
 	}

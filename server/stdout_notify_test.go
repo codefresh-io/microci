@@ -13,22 +13,36 @@ func TestStdoutNotify_SendBuildReport(t *testing.T) {
 	type args struct {
 		ctx    context.Context
 		r      io.ReadCloser
-		target BuildTarget
+		report BuildReport
 	}
 	tests := []struct {
 		name string
 		out  StdoutNotify
 		args args
 	}{
-		{"empty", StdoutNotify{}, args{ctx, ioutil.NopCloser(strings.NewReader("")), BuildTarget{}}},
-		{"success", StdoutNotify{}, args{ctx, ioutil.NopCloser(strings.NewReader(`{"stream": "Successfully built abcd1234abcd"}`)), BuildTarget{}}},
-		{"success", StdoutNotify{}, args{ctx, ioutil.NopCloser(strings.NewReader(`{"stream": "Successfully built abcd1234abcd"}`)), BuildTarget{"test/image", "latest", "git://git/repository"}}},
-		{"error", StdoutNotify{}, args{ctx, ioutil.NopCloser(strings.NewReader("ERROR")), BuildTarget{}}},
+		{"empty", StdoutNotify{}, args{ctx, ioutil.NopCloser(strings.NewReader("")), BuildReport{}}},
+		{"success", StdoutNotify{}, args{ctx, ioutil.NopCloser(strings.NewReader(`{"stream": "Successfully built abcd1234abcd"}`)), BuildReport{}}},
+		{
+			"success",
+			StdoutNotify{},
+			args{
+				ctx,
+				ioutil.NopCloser(strings.NewReader(`{"stream": "Successfully built abcd1234abcd"}`)),
+				BuildReport{
+					RepoName:     "test-repo",
+					Owner:        "test-user",
+					ImageName:    "test-repo/test-user",
+					Tag:          "latest",
+					BuildContext: "git://git/repository",
+				},
+			},
+		},
+		{"error", StdoutNotify{}, args{ctx, ioutil.NopCloser(strings.NewReader("ERROR")), BuildReport{}}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			out := StdoutNotify{}
-			out.SendBuildReport(tt.args.ctx, tt.args.r, tt.args.target)
+			out.SendBuildReport(tt.args.ctx, tt.args.r, tt.args.report)
 		})
 	}
 }

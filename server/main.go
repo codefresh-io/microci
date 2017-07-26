@@ -97,6 +97,14 @@ Copyright © Codefresh.io`, ASCIILogo)
 					Usage: "GitHub webhook secret",
 				},
 				cli.StringFlag{
+					Name:  "github-user",
+					Usage: "GitHub user",
+				},
+				cli.StringFlag{
+					Name:  "github-token",
+					Usage: "GitHub personal token",
+				},
+				cli.StringFlag{
 					Name:  "ip",
 					Usage: "ip the webhook should serve hooks on",
 					Value: "0.0.0.0",
@@ -200,6 +208,10 @@ func handleSignals(sigs chan os.Signal, exitOnSignal bool) {
 func handleWebhook(c *cli.Context) http.Handler {
 	// get GitHub secret
 	secret := c.String("secret")
+	// get GitHub token
+	githubToken := c.String("github-token")
+	// get GitHub token
+	githubUser := c.String("github-user")
 	// get slack token and channel
 	slackToken := c.String("slack-token")
 	slackChannel := c.String("slack-channel")
@@ -221,9 +233,14 @@ func handleWebhook(c *cli.Context) http.Handler {
 		gCancelCommands.Append(cancel)
 		getDockerClient().RegistryLogin(ctx, user, password, registry)
 	}
+	// GitHub status notify interface
+	var statusNotify GitStatusNotify
+	if githubUser != "" && githubToken != "" {
+		statusNotify = NewGitHubStatusNotify(githubUser, githubToken)
+	}
 
 	// create new webhook
-	githubHook := New(registry, repository, gCancelCommands, notify, &github.Config{Secret: secret})
+	githubHook := NewGitHubHook(registry, repository, gCancelCommands, notify, statusNotify, githubUser, githubToken, &github.Config{Secret: secret})
 	// register push event handler
 	githubHook.RegisterPushEvent()
 	// register create event handler

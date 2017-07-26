@@ -23,19 +23,16 @@ type StdoutNotify struct {
 }
 
 // SendBuildReport stream build output to STDOUT
-func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, target BuildTarget) {
+func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, buildReport BuildReport) {
 	defer r.Close()
-	// create build report
-	var buildReport BuildReport
-	buildReport.BuildTarget = target
 	// print build status
 	fmt.Println("===== Docker Build =====")
-	fmt.Printf("Building %s:%s\n", target.Name, target.Tag)
-	fmt.Printf("From git context: %s\n", target.GitContext)
+	fmt.Printf("Building %s:%s\n", buildReport.ImageName, buildReport.Tag)
+	fmt.Printf("From git context: %s\n", buildReport.BuildContext)
 	buildReport.Start = time.Now()
 	// regexp to decide on build status: FAILED by default
 	re := regexp.MustCompile("Successfully built ([0-9a-f]{12})")
-	buildReport.Status = "FAILED"
+	buildReport.SetStatus(StatusRunning)
 	// stream build output
 	scanner := bufio.NewScanner(r)
 	for scanner.Scan() {
@@ -48,14 +45,18 @@ func (out StdoutNotify) SendBuildReport(ctx context.Context, r io.ReadCloser, ta
 		fmt.Print(line.Stream)
 		status := re.FindString(line.Stream)
 		if status != "" {
-			buildReport.Status = "PASSED"
+			buildReport.SetStatus(StatusPassed)
 		}
+	}
+	if buildReport.status != StatusPassed {
+		buildReport.SetStatus(StatusFailed)
 	}
 	if err := scanner.Err(); err != nil {
 		log.Error(err)
+		buildReport.SetStatus(StatusError)
 	}
 	// output build status
-	fmt.Printf("Build status: %s\n", buildReport.Status)
+	fmt.Printf("Build status: %s\n", buildReport.GetStatus())
 	// calculate duration
 	buildReport.Duration = time.Since(buildReport.Start)
 	// print duration

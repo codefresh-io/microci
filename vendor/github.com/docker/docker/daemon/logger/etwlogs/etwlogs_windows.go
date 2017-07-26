@@ -16,7 +16,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"syscall"
 	"unsafe"
 
 	"github.com/Sirupsen/logrus"
@@ -42,12 +41,12 @@ var (
 	procEventWriteString = modAdvapi32.NewProc("EventWriteString")
 	procEventUnregister  = modAdvapi32.NewProc("EventUnregister")
 )
-var providerHandle syscall.Handle
+var providerHandle windows.Handle
 var refCount int
 var mu sync.Mutex
 
 func init() {
-	providerHandle = syscall.InvalidHandle
+	providerHandle = windows.InvalidHandle
 	if err := logger.RegisterLogDriver(name, New); err != nil {
 		logrus.Fatal(err)
 	}
@@ -70,13 +69,15 @@ func New(info logger.Info) (logger.Logger, error) {
 
 // Log logs the message to the ETW stream.
 func (etwLogger *etwLogs) Log(msg *logger.Message) error {
-	if providerHandle == syscall.InvalidHandle {
+	if providerHandle == windows.InvalidHandle {
 		// This should never be hit, if it is, it indicates a programming error.
 		errorMessage := "ETWLogs cannot log the message, because the event provider has not been registered."
 		logrus.Error(errorMessage)
 		return errors.New(errorMessage)
 	}
-	return callEventWriteString(createLogMessage(etwLogger, msg))
+	m := createLogMessage(etwLogger, msg)
+	logger.PutMessage(msg)
+	return callEventWriteString(m)
 }
 
 // Close closes the logger by unregistering the ETW provider.
@@ -119,7 +120,7 @@ func unregisterETWProvider() {
 	if refCount == 1 {
 		if callEventUnregister() {
 			refCount--
-			providerHandle = syscall.InvalidHandle
+			providerHandle = windows.InvalidHandle
 		}
 		// Not returning an error if EventUnregister fails, because etwLogs will continue to work
 	} else {
@@ -129,7 +130,7 @@ func unregisterETWProvider() {
 
 func callEventRegister() error {
 	// The provider's GUID is {a3693192-9ed6-46d2-a981-f8226c8363bd}
-	guid := syscall.GUID{
+	guid := windows.GUID{
 		Data1: 0xa3693192,
 		Data2: 0x9ed6,
 		Data3: 0x46d2,
@@ -146,7 +147,13 @@ func callEventRegister() error {
 }
 
 func callEventWriteString(message string) error {
-	ret, _, _ := procEventWriteString.Call(uintptr(providerHandle), 0, 0, uintptr(unsafe.Pointer(syscall.StringToUTF16Ptr(message))))
+	utf16message, err := windows.UTF16FromString(message)
+
+	if err != nil {
+		return err
+	}
+
+	ret, _, _ := procEventWriteString.Call(uintptr(providerHandle), 0, 0, uintptr(unsafe.Pointer(&utf16message[0])))
 	if ret != win32CallSuccess {
 		errorMessage := fmt.Sprintf("ETWLogs provider failed to log message. Error: %d", ret)
 		logrus.Error(errorMessage)

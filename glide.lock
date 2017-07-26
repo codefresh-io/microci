@@ -1,50 +1,69 @@
-hash: 3ffc057277fef08eb7eed3f8b44b8ba32d14bb99d851a1439d46a20587993a89
-updated: 2017-07-24T18:57:07.912696599+03:00
+hash: 6fc1585d53a13c55a77294cfe62aa8cce4e275773b10bd370ea62a543104fbe9
+updated: 2017-07-26T13:51:01.66970866+03:00
 imports:
 - name: github.com/docker/distribution
-  version: 4abae2ae560ba91db98779db2739eb97d7592fba
+  version: e18fe7d3f4573faac5a32a0df3322a4812969c92
   subpackages:
-  - digest
+  - digestset
   - reference
 - name: github.com/docker/docker
-  version: bf8cdb9172c3516eecb80974971b0b2da00afc11
+  version: 72cda6a6c2f25854bea2d69168082684f2c9feca
   subpackages:
+  - api
   - api/types
   - api/types/blkiodev
   - api/types/container
   - api/types/events
   - api/types/filters
+  - api/types/image
   - api/types/mount
   - api/types/network
-  - api/types/reference
   - api/types/registry
   - api/types/strslice
   - api/types/swarm
+  - api/types/swarm/runtime
   - api/types/time
   - api/types/versions
   - api/types/volume
   - client
+  - pkg/ioutils
+  - pkg/longpath
+  - pkg/mount
+  - pkg/system
   - pkg/tlsconfig
 - name: github.com/docker/go-connections
-  version: 990a1a1a70b0da4c4cb70e117971a4f0babfbf1a
+  version: 3ede32e2033de7505e6500d6c868c2b9ed9f169d
   subpackages:
   - nat
   - sockets
   - tlsconfig
 - name: github.com/docker/go-units
-  version: 5d2041e26a699eaca682e2ea41c8f891e1060444
-- name: github.com/Microsoft/go-winio
-  version: ce2922f643c8fd76b46cadc7f404a06282678b34
-- name: github.com/nlopes/slack
-  version: c86337c0ef2486a15edd804355d9c73d2f2caed1
-- name: github.com/opencontainers/runc
-  version: fb221651e5120cd287a76c7c1b6c877520fbd034
+  version: 0dadbb0345b35ec7ef35e228dabb8de89a65bf52
+- name: github.com/docker/libtrust
+  version: aabc10ec26b754e797f9028f4589c5b7bd90dc20
+- name: github.com/gogo/protobuf
+  version: 7b6c6391c4ff245962047fc1e2c6e08b1cdfa0e8
   subpackages:
-  - libcontainer/user
+  - proto
+- name: github.com/jcjones/github-pr-status
+  version: e7301cdcebd62f452e970096f763fe5fbeec5cd7
+  subpackages:
+  - api
+- name: github.com/Microsoft/go-winio
+  version: 7ff89941bcb93df2e962467fb073c6e997b13cf0
+- name: github.com/nlopes/slack
+  version: 5cde21b8b96a43fc3435a1f514123d14fd7eabdc
+- name: github.com/opencontainers/go-digest
+  version: 279bed98673dd5bef374d3b6e4b09e2af76183bf
+- name: github.com/opencontainers/image-spec
+  version: ef2b9a1d696677abd664a0879758d2b115b1ded3
+  subpackages:
+  - specs-go
+  - specs-go/v1
 - name: github.com/pborman/uuid
   version: e790cca94e6cc75c7064b1332e63811d4aae1a53
 - name: github.com/pkg/errors
-  version: 248dadf4e9068a0b3e79f02ed0a610d935de5302
+  version: c605e284fe17294bda444b34710735b29d1a9d90
 - name: github.com/Sirupsen/logrus
   version: a3f95b5c423586578a4e099b11a46c2479628cac
 - name: github.com/stretchr/testify
@@ -53,21 +72,21 @@ imports:
   - assert
   - mock
 - name: github.com/urfave/cli
-  version: 1efa31f08b9333f1bd4882d61f9d668a70cd902e
+  version: 0bdeddeeb0f650497d603c4ad7b20cfe685682f6
 - name: golang.org/x/net
-  version: 4876518f9e71663000c348837735820161a42df7
+  version: f5079bd7f6f74e23c4d65efa0f4ce14cbd6a3c0f
   subpackages:
   - context
   - context/ctxhttp
   - proxy
   - websocket
 - name: golang.org/x/sys
-  version: a60af9cbbc6ab800af4f2be864a31f423a0ae1f2
+  version: c4489faa6e5ab84c0ef40d6ee878f7a030281f0f
   subpackages:
   - unix
   - windows
 - name: gopkg.in/go-playground/webhooks.v3
-  version: 9a8b92d028c1d3cc75fd2fdfcafdb5bcdba6e026
+  version: a5141d656b4d528788fe140307fe2468bfdbd212
   subpackages:
   - github
 testImports:

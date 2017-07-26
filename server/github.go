@@ -16,18 +16,24 @@ type GitHubHook struct {
 	webhook        *github.Webhook
 	Registry       string
 	Repository     string
+	Token          string
+	User           string
 	Notify         BuildNotify
+	StatusNotify   GitStatusNotify
 	CancelCommands *ConcurrentSlice
 }
 
-// New creates and returns a GitHubHook instance
-func New(registry, repository string, commands *ConcurrentSlice, notify BuildNotify, config *github.Config) *GitHubHook {
+// NewGitHubHook creates and returns a GitHubHook instance
+func NewGitHubHook(registry, repository string, commands *ConcurrentSlice, notify BuildNotify, statusNotify GitStatusNotify, user, token string, config *github.Config) *GitHubHook {
 	return &GitHubHook{
 		webhook:        github.New(config),
 		CancelCommands: commands,
 		Notify:         notify,
+		StatusNotify:   statusNotify,
 		Registry:       registry,
 		Repository:     repository,
+		User:           user,
+		Token:          token,
 	}
 }
 
@@ -66,7 +72,7 @@ func (hook GitHubHook) handlePushEvent(payload interface{}, header webhooks.Head
 	ctx, cancel := context.WithCancel(context.Background())
 	hook.CancelCommands.Append(cancel)
 	client := getDockerClient()
-	go client.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, pl.HeadCommit.ID, hook.Registry, hook.Repository, hook.Notify)
+	go client.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.Owner.Name, pl.HeadCommit.ID, hook.Registry, hook.Repository, hook.Notify, hook.StatusNotify)
 }
 
 // handleCreateEvent handles GitHub create events
@@ -87,6 +93,6 @@ func (hook GitHubHook) handleCreateEvent(payload interface{}, header webhooks.He
 		ctx, cancel := context.WithCancel(context.Background())
 		hook.CancelCommands.Append(cancel)
 		client := getDockerClient()
-		go client.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.FullName, ref, hook.Registry, hook.Repository, hook.Notify)
+		go client.BuildPushImage(ctx, cloneURL, ref, pl.Repository.Name, pl.Repository.Owner.Login, ref, hook.Registry, hook.Repository, hook.Notify, hook.StatusNotify)
 	}
 }
