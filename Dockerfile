@@ -40,8 +40,8 @@ RUN apk add --no-cache ca-certificates
 # add user:group
 RUN addgroup microci && adduser -s /bin/bash -D -G microci microci
 
-ENV GOSU_VERSION 1.10
-ENV GOSU_SHA_256 5b3b03713a888cee84ecbf4582b21ac9fd46c3d935ff2d7ea25dd5055d302d3c
+ARG GOSU_VERSION=1.10
+ARG GOSU_SHA_256=5b3b03713a888cee84ecbf4582b21ac9fd46c3d935ff2d7ea25dd5055d302d3c
 
 RUN apk add --no-cache --virtual .gosu-deps curl && \
     curl -o /tmp/gosu-amd64 -LS  "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-amd64" && \
