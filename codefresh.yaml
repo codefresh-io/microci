@@ -10,7 +10,7 @@ steps:
     image-name: codefreshio/microci
     build_arguments:
       - GIT_COMMIT=${{CF_REVISION}}
-      - GIT_BRANCH=${{CFB_RANCH}}
+      - GIT_BRANCH=${{CF_BRANCH}}
       - CODECOV_TOKEN=${{CODECOV_TOKEN}}
 
   dockerhub-push:
