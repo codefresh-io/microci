@@ -13,8 +13,8 @@ steps:
       - GIT_BRANCH=${{CF_BRANCH}}
       # codecov variables (can detect Codefresh too)
       - CODECOV_TOKEN=${{CODECOV_TOKEN}}
-      - CF_BUILD_URL=${{CF_BUILD_URL}}
-      - CF_BUILD_ID=${{CF_BUILD_ID}}
+      - BUILD_URL=${{CF_BUILD_URL}}
+      - BUILD_ID=${{CF_BUILD_ID}}
 
   dockerhub-push:
     type: push
