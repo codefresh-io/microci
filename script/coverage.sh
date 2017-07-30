@@ -20,9 +20,7 @@ generate_cover_data() {
     f="${COVER}/$(echo $pkg | tr / -).cover"
     tf="${COVER}/$(echo $pkg | tr / -)_tests.xml"
     tout="${COVER}/$(echo $pkg | tr / -)_tests.out"
-    #go test -v -covermode="$mode" -coverprofile="$f" "$pkg" | go-junit-report > "$tf"
     go test -v -covermode="$mode" -coverprofile="$f" "$pkg" | tee "$tout"
-    cat "$tout" | go-junit-report > "$tf"
   done
 
   echo "mode: $mode" >"$profile"

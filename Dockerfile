@@ -4,7 +4,7 @@
 FROM golang:1.8-alpine3.6 AS builder
 
 # install required packages: curl and bash
-RUN apk add --no-cache bash curl
+RUN apk add --no-cache bash curl git
 
 # github-release - Github Release and upload artifacts
 ARG GITHUB_RELEASE=v0.7.2
