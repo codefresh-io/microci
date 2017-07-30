@@ -4,7 +4,7 @@
 FROM golang:1.8-alpine3.6 AS builder
 
 # install required packages: curl and bash
-RUN apk add --no-cache bash curl git
+RUN apk add --no-cache bash curl git findutils
 
 # github-release - Github Release and upload artifacts
 ARG GITHUB_RELEASE=v0.7.2
@@ -40,7 +40,7 @@ ARG BUILD_ID=dev
 RUN VERSION=$(cat VERSION) script/coverage.sh
 # upload coverage reports to Codecov.io: pass CODECOV_TOKEN as build-arg
 ARG CODECOV_TOKEN
-RUN if [ "$CODECOV_TOKEN" != "" ]; then bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN} -B ${GIT_BRANCH} -C ${GIT_COMMIT} -b ${BUILD_ID}; fi
+RUN if [ "$CODECOV_TOKEN" != "" ]; then curl -s https://codecov.io/bash | bash -s - -t ${CODECOV_TOKEN} -B ${GIT_BRANCH} -C ${GIT_COMMIT} -b ${BUILD_ID}; fi
 
 # build microci binary
 
