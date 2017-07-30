@@ -35,7 +35,8 @@ ENTRYPOINT ["/bin/bash"]
 RUN VERSION=$(cat VERSION) script/coverage.sh
 # upload coverage reports to Codecov.io: pass CODECOV_TOKEN as build-arg
 ARG CODECOV_TOKEN
-RUN if [ "$CODECOV_TOKEN" != "" ]; then bash -c "bash <(curl -s https://codecov.io/bash) -t ${CODECOV_TOKEN}"; fi
+ENV CODECOV_TOKEN=${CODECOV_TOKEN}
+RUN if [ "$CODECOV_TOKEN" != "" ]; then bash -c "bash <(curl -s https://codecov.io/bash)"; fi
 
 # build microci binary
 ARG GIT_COMMIT
