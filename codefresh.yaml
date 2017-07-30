@@ -9,7 +9,8 @@ steps:
     working-directory: ${{main_clone}}
     image-name: codefreshio/microci
     build_arguments:
-      - GH_SHA=${{CF_REVISION}}
+      - GIT_COMMIT=${{CF_REVISION}}
+      - GIT_BRANCH=${{CFB_RANCH}}
       - CODECOV_TOKEN=${{CODECOV_TOKEN}}
 
   dockerhub-push:

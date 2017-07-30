@@ -2,3 +2,6 @@
 .idea
 .cover
 .vscode
+.git
+dist
+out
