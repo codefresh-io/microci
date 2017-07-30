@@ -11,10 +11,8 @@ steps:
     build_arguments:
       - GIT_COMMIT=${{CF_REVISION}}
       - GIT_BRANCH=${{CF_BRANCH}}
-      # codecov variables (can detect Codefresh too)
-      - CODECOV_TOKEN=${{CODECOV_TOKEN}}
-      - BUILD_URL=${{CF_BUILD_URL}}
       - BUILD_ID=${{CF_BUILD_ID}}
+      - CODECOV_TOKEN=${{CODECOV_TOKEN}}
 
   dockerhub-push:
     type: push
