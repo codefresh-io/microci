@@ -15,6 +15,8 @@ steps:
       - CI_BUILD_ID=${{CF_BUILD_ID}}
       - CI_BUILD_URL=${{CF_BUILD_URL}}
       - CODECOV_TOKEN=${{CODECOV_TOKEN}}
+      # temporary solution till Codecov fix find argumnents bug in codecov.io/bash
+      - CODECOV_BASH_URL=https://raw.githubusercontent.com/codecov/codecov-bash/master/codecov
 
   dockerhub-push:
     type: push
