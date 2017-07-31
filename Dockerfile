@@ -31,16 +31,18 @@ COPY . .
 # set entrypoint to bash
 ENTRYPOINT ["/bin/bash"]
 
-# git and build inf
-ARG GIT_COMMIT
-ARG GIT_BRANCH
-ARG BUILD_ID=dev
-
 # run test and calculate coverage
 RUN VERSION=$(cat VERSION) script/coverage.sh
 # upload coverage reports to Codecov.io: pass CODECOV_TOKEN as build-arg
 ARG CODECOV_TOKEN
-RUN if [ "$CODECOV_TOKEN" != "" ]; then curl -s https://codecov.io/bash | bash -s - -t ${CODECOV_TOKEN} -B ${GIT_BRANCH} -C ${GIT_COMMIT} -b ${BUILD_ID}; fi
+# set Codecov env
+ARG VCS_COMMIT_ID
+ARG VCS_BRANCH_NAME
+ARG VCS_SLUG
+ARG CI_BUILD_URL
+ARG CI_BUILD_ID
+RUN if [ "$CODECOV_TOKEN" != "" ]; then bash <(curl -s https://codecov.io/bash); fi
+# RUN if [ "$CODECOV_TOKEN" != "" ]; then bash codecov.sh; fi
 
 # build microci binary
 
