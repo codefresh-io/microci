@@ -12,6 +12,15 @@
 profile="$COVER/cover.out"
 mode=count
 
+OS=$(uname)
+race_flag="-race"
+if [ "$OS" = "Linux" ]; then
+  # check Alpine - alpine does not support race test
+  if [ -f "/etc/alpine-release" ]; then 
+    race_flag=""
+  fi
+fi
+
 generate_cover_data() {
   [ -d "${COVER}" ] && rm -rf "${COVER:?}/*"
   [ -d "${COVER}" ] || mkdir -p "${COVER}"
@@ -19,7 +28,7 @@ generate_cover_data() {
   for pkg in "$@"; do
     f="${COVER}/$(echo $pkg | tr / -).cover"
     tout="${COVER}/$(echo $pkg | tr / -)_tests.out"
-    go test -race -v -covermode="$mode" -coverprofile="$f" "$pkg" | tee "$tout"
+    go test $race_flag -covermode="$mode" -coverprofile="$f" "$pkg" | tee "$tout"
   done
 
   echo "mode: $mode" >"$profile"

@@ -88,7 +88,6 @@ func Test_before(t *testing.T) {
 func Test_handleSignals(t *testing.T) {
 	_, cancel := context.WithCancel(context.Background())
 	gCancelCommands.Append(cancel)
-	sigs := make(chan os.Signal, 1)
 	type args struct {
 		sigs         chan os.Signal
 		exitOnSignal bool
@@ -98,14 +97,14 @@ func Test_handleSignals(t *testing.T) {
 		args args
 		sig  os.Signal
 	}{
-		{"SIGTERM", args{sigs, false}, syscall.SIGTERM},
-		{"SIGKILL", args{sigs, false}, syscall.SIGKILL},
-		{"UNKNOWN", args{sigs, false}, syscall.SIGUSR1},
+		{"SIGTERM", args{make(chan os.Signal, 1), false}, syscall.SIGTERM},
+		{"SIGKILL", args{make(chan os.Signal, 1), false}, syscall.SIGKILL},
+		{"UNKNOWN", args{make(chan os.Signal, 1), false}, syscall.SIGUSR1},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			handleSignals(tt.args.sigs, tt.args.exitOnSignal)
-			sigs <- tt.sig
+			tt.args.sigs <- tt.sig
 			// wait a while to handle signal
 			time.Sleep(time.Millisecond)
 		})
