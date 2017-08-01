@@ -10,7 +10,7 @@
 #
 [ -z "$COVER" ] && COVER=.cover
 profile="$COVER/cover.out"
-mode=count
+mode=atomic
 
 OS=$(uname)
 race_flag="-race"
