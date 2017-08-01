@@ -3,6 +3,8 @@ package main
 import (
 	"errors"
 	"io"
+	"io/ioutil"
+	"strings"
 	"testing"
 
 	"github.com/docker/docker/api/types"
@@ -147,7 +149,7 @@ func Test_dockerAPI_BuildPushImage(t *testing.T) {
 		cloneURL     string
 		ref          string
 		name         string
-		fullname     string
+		owner        string
 		tag          string
 		registry     string
 		repository   string
@@ -160,7 +162,27 @@ func Test_dockerAPI_BuildPushImage(t *testing.T) {
 		args    args
 		wantErr bool
 	}{
-	// TODO: Add test cases.
+		// handle GitHub push event
+		{
+			"gitHubPushEvent",
+			fields{
+				apiClient:  &DockerClientAPIMock{},
+				authBase64: "XXX",
+			},
+			args{
+				ctx:          context.Background(),
+				cloneURL:     "https://github.com/alexei-led/alpine-plus.git",
+				ref:          "master",
+				name:         "alpine-plus",
+				owner:        "alexei-led",
+				tag:          "185955b1bfa4b6416d2c9f868571110e92e44821",
+				registry:     "",
+				repository:   "alexeiled",
+				notify:       nil,
+				statusNotify: nil,
+			},
+			false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -168,9 +190,12 @@ func Test_dockerAPI_BuildPushImage(t *testing.T) {
 				apiClient:  tt.fields.apiClient,
 				authBase64: tt.fields.authBase64,
 			}
-			if err := api.BuildPushImage(tt.args.ctx, tt.args.cloneURL, tt.args.ref, tt.args.name, tt.args.fullname, tt.args.tag, tt.args.registry, tt.args.repository, tt.args.notify, tt.args.statusNotify); (err != nil) != tt.wantErr {
+			api.apiClient.(*DockerClientAPIMock).On("ImageBuild", tt.args.ctx, nil, mock.AnythingOfType("ImageBuildOptions")).Return(types.ImageBuildResponse{Body: ioutil.NopCloser(strings.NewReader("")), OSType: "Linux"}, nil)
+			api.apiClient.(*DockerClientAPIMock).On("ImagePush", tt.args.ctx, mock.AnythingOfType("string"), mock.AnythingOfType("ImagePushOptions")).Return(ioutil.NopCloser(strings.NewReader("")), nil)
+			if err := api.BuildPushImage(tt.args.ctx, tt.args.cloneURL, tt.args.ref, tt.args.name, tt.args.owner, tt.args.tag, tt.args.registry, tt.args.repository, tt.args.notify, tt.args.statusNotify); (err != nil) != tt.wantErr {
 				t.Errorf("dockerAPI.BuildPushImage() error = %v, wantErr %v", err, tt.wantErr)
 			}
+			api.apiClient.(*DockerClientAPIMock).AssertExpectations(t)
 		})
 	}
 }

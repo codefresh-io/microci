@@ -19,7 +19,7 @@ generate_cover_data() {
   for pkg in "$@"; do
     f="${COVER}/$(echo $pkg | tr / -).cover"
     tout="${COVER}/$(echo $pkg | tr / -)_tests.out"
-    go test -v -covermode="$mode" -coverprofile="$f" "$pkg" | tee "$tout"
+    go test -race -v -covermode="$mode" -coverprofile="$f" "$pkg" | tee "$tout"
   done
 
   echo "mode: $mode" >"$profile"

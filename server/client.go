@@ -84,7 +84,7 @@ func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, repoNam
 	} else {
 		imageName += owner + "/" + repoName
 	}
-	// get branch fro ref (if branch) or tag
+	// get branch from ref (if branch) or tag
 	refs := strings.Split(ref, "/")
 	tagText := refs[len(refs)-1]
 	// prepare 2 tags
@@ -111,7 +111,9 @@ func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, repoNam
 	buildReport.StatusNotify = statusNotify
 
 	// send build output and status
-	notify.SendBuildReport(ctx, buildResponse.Body, buildReport)
+	if notify != nil {
+		notify.SendBuildReport(ctx, buildResponse.Body, buildReport)
+	}
 
 	// push new image, if registry authBase64 is not nil (credentials specified)
 	if api.authBase64 != "" {
@@ -125,7 +127,9 @@ func (api *dockerAPI) BuildPushImage(ctx context.Context, cloneURL, ref, repoNam
 				return err
 			}
 			// send output and status
-			notify.SendPushReport(ctx, pushResponse, image)
+			if notify != nil {
+				notify.SendPushReport(ctx, pushResponse, image)
+			}
 		}
 	}
 	return nil
