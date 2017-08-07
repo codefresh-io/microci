@@ -4,7 +4,7 @@
 FROM golang:1.8-alpine3.6 AS builder
 
 # install required packages: curl and bash
-RUN apk add --no-cache bash curl git
+RUN apk add --no-cache bash curl git || apk update && apk upgrade
 
 # github-release - Github Release and upload artifacts
 ARG GITHUB_RELEASE=v0.7.2
@@ -71,4 +71,10 @@ CMD ["microci", "--help"]
 
 ARG GIT_COMMIT=dev
 LABEL org.label-schema.vcs-ref=$GIT_COMMIT \
-      org.label-schema.vcs-url="https://github.com/codefresh-io/microci"
+      org.label-schema.vcs-url="https://github.com/codefresh-io/microci" \
+      org.label-schema.description="MicroCI is a native continuous integration for Docker-based microservices" \
+      org.label-schema.vendor="Codefresh Inc." \
+      org.label-schema.url="https://github.com/codefresh-io/microci" \
+      org.label-schema.version="0.2.0" \
+      org.label-schema.docker.cmd="docker run -d --rm -p 9000:9000 -v /var/run/docker.sock:/var/run/docker.sock codefreshio/microci microci server" \
+      org.label-schema.docker.cmd.help="docker run -it --rm codefreshio/microci microci --help"
